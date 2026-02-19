@@ -2,6 +2,7 @@
 import React from "react";
 import {
   Alert,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -13,6 +14,11 @@ export default function DashboardScreen() {
   const { user, logout } = useAuthStore();
 
   const handleLogout = () => {
+    // Alert.alert은 Expo Web에서 no-op이므로 웹은 window.confirm으로 분기
+    if (Platform.OS === "web") {
+      if (window.confirm("정말 로그아웃할까요?")) logout();
+      return;
+    }
     Alert.alert("로그아웃", "정말 로그아웃할까요?", [
       { text: "취소", style: "cancel" },
       { text: "로그아웃", style: "destructive", onPress: logout },
