@@ -1,11 +1,11 @@
 // frontend/src/screens/transactions/TransactionListScreen.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Modal,
   Platform,
+  SectionList,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,8 +16,10 @@ import {
 import { useTransactionStore } from "../../store/transactionStore";
 import { useCategoryStore } from "../../store/categoryStore";
 import { Transaction } from "../../types";
+import { theme } from "../../theme";
 
 type TransactionType = "income" | "expense" | "transfer";
+type FilterType = "all" | TransactionType;
 
 const TYPE_LABELS: Record<TransactionType, string> = {
   income: "수입",
@@ -26,15 +28,9 @@ const TYPE_LABELS: Record<TransactionType, string> = {
 };
 
 const TYPE_COLORS: Record<TransactionType, string> = {
-  income: "#22c55e",
-  expense: "#ef4444",
-  transfer: "##3b82f6",
-};
-
-const AMOUNT_COLORS: Record<TransactionType, string> = {
-  income: "#22c55e",
-  expense: "#ef4444",
-  transfer: "#6b7280",
+  income: theme.colors.income,
+  expense: theme.colors.expense,
+  transfer: theme.colors.transfer,
 };
 
 function formatAmount(type: TransactionType, amount: number): string {
@@ -52,6 +48,11 @@ function formatDate(iso: string): string {
 function toLocalISODate(iso: string): string {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function sectionTitle(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
 }
 
 // ── 폼 모달 ──────────────────────────────────────────────
@@ -75,7 +76,9 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
   const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [categoryId, setCategoryId] = useState(initial?.category_id ?? "");
-  const [date, setDate] = useState(initial ? toLocalISODate(initial.transacted_at) : toLocalISODate(new Date().toISOString()));
+  const [date, setDate] = useState(
+    initial ? toLocalISODate(initial.transacted_at) : toLocalISODate(new Date().toISOString())
+  );
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -84,7 +87,9 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
       setAmount(initial ? String(initial.amount) : "");
       setDescription(initial?.description ?? "");
       setCategoryId(initial?.category_id ?? "");
-      setDate(initial ? toLocalISODate(initial.transacted_at) : toLocalISODate(new Date().toISOString()));
+      setDate(
+        initial ? toLocalISODate(initial.transacted_at) : toLocalISODate(new Date().toISOString())
+      );
     }
   }, [visible, initial]);
 
@@ -121,7 +126,10 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
               {(["income", "expense", "transfer"] as TransactionType[]).map((t) => (
                 <TouchableOpacity
                   key={t}
-                  style={[styles.typeBtn, type === t && { backgroundColor: TYPE_COLORS[t] }]}
+                  style={[
+                    styles.typeBtn,
+                    type === t && { backgroundColor: TYPE_COLORS[t], borderColor: TYPE_COLORS[t] },
+                  ]}
                   onPress={() => setType(t)}
                 >
                   <Text style={[styles.typeBtnText, type === t && { color: "#fff" }]}>
@@ -158,16 +166,6 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
             />
 
             <Text style={styles.label}>카테고리 (선택)</Text>
-            <TouchableOpacity
-              style={[styles.input, styles.categorySelector]}
-              onPress={() => setCategoryId("")}
-            >
-              <Text style={categoryId ? styles.categorySelectorText : styles.categorySelectorPlaceholder}>
-                {categoryId
-                  ? categories.find((c) => c.id === categoryId)?.name ?? "카테고리 선택"
-                  : "없음"}
-              </Text>
-            </TouchableOpacity>
             <View style={styles.categoryList}>
               <TouchableOpacity
                 style={[styles.categoryChip, !categoryId && styles.categoryChipSelected]}
@@ -183,7 +181,7 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
                   style={[
                     styles.categoryChip,
                     categoryId === c.id && styles.categoryChipSelected,
-                    categoryId === c.id && { borderColor: c.color ?? "#4F46E5" },
+                    categoryId === c.id && { borderColor: c.color ?? theme.colors.primary },
                   ]}
                   onPress={() => setCategoryId(c.id)}
                 >
@@ -227,12 +225,19 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
 
 // ── 메인 화면 ─────────────────────────────────────────────
 export default function TransactionListScreen() {
-  const { transactions, isLoading, fetchTransactions, createTransaction, updateTransaction, deleteTransaction } =
-    useTransactionStore();
+  const {
+    transactions,
+    isLoading,
+    fetchTransactions,
+    createTransaction,
+    updateTransaction,
+    deleteTransaction,
+  } = useTransactionStore();
   const { categories, fetchCategories } = useCategoryStore();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [filter, setFilter] = useState<FilterType>("all");
 
   useEffect(() => {
     fetchTransactions();
@@ -252,7 +257,7 @@ export default function TransactionListScreen() {
   const handleDelete = (item: Transaction) => {
     const doDelete = () => deleteTransaction(item.id);
     if (Platform.OS === "web") {
-      if (window.confirm(`이 내역을 삭제할까요?`)) doDelete();
+      if (window.confirm("이 내역을 삭제할까요?")) doDelete();
     } else {
       Alert.alert("삭제", "이 내역을 삭제할까요?", [
         { text: "취소", style: "cancel" },
@@ -282,43 +287,42 @@ export default function TransactionListScreen() {
     }
   };
 
-  const getCategoryName = (categoryId: string | null) => {
-    if (!categoryId) return null;
-    return categories.find((c) => c.id === categoryId)?.name ?? null;
-  };
+  const getCategoryName = (categoryId: string | null) =>
+    categories.find((c) => c.id === categoryId)?.name ?? null;
 
-  const renderItem = ({ item }: { item: Transaction }) => (
-    <View style={styles.row}>
-      <View style={styles.rowLeft}>
-        <Text style={[styles.rowType, { color: TYPE_COLORS[item.type as TransactionType] }]}>
-          {TYPE_LABELS[item.type as TransactionType]}
-        </Text>
-        <Text style={styles.rowDate}>{formatDate(item.transacted_at)}</Text>
-      </View>
-      <View style={styles.rowInfo}>
-        {item.description ? (
-          <Text style={styles.rowDescription} numberOfLines={1}>
-            {item.description}
-          </Text>
-        ) : null}
-        {getCategoryName(item.category_id) && (
-          <Text style={styles.rowCategory}>{getCategoryName(item.category_id)}</Text>
-        )}
-      </View>
-      <Text style={[styles.rowAmount, { color: AMOUNT_COLORS[item.type as TransactionType] }]}>
-        {formatAmount(item.type as TransactionType, item.amount)}
-      </Text>
-      <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
-        <Text style={styles.editBtnText}>수정</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
-        <Text style={styles.deleteBtnText}>삭제</Text>
-      </TouchableOpacity>
-    </View>
+  // 필터 적용
+  const filtered = useMemo(
+    () =>
+      filter === "all"
+        ? transactions
+        : transactions.filter((t) => t.type === filter),
+    [transactions, filter]
   );
+
+  // 월별 섹션 그룹화
+  const sections = useMemo(() => {
+    const sorted = [...filtered].sort(
+      (a, b) => new Date(b.transacted_at).getTime() - new Date(a.transacted_at).getTime()
+    );
+    const map = new Map<string, Transaction[]>();
+    for (const tx of sorted) {
+      const key = sectionTitle(tx.transacted_at);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(tx);
+    }
+    return Array.from(map.entries()).map(([title, data]) => ({ title, data }));
+  }, [filtered]);
+
+  const FILTERS: { key: FilterType; label: string }[] = [
+    { key: "all", label: "전체" },
+    { key: "income", label: "수입" },
+    { key: "expense", label: "지출" },
+    { key: "transfer", label: "이체" },
+  ];
 
   return (
     <View style={styles.container}>
+      {/* 헤더 */}
       <View style={styles.header}>
         <Text style={styles.title}>거래 내역</Text>
         <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
@@ -326,16 +330,68 @@ export default function TransactionListScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* 필터 탭 */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
+        contentContainerStyle={styles.filterContent}
+      >
+        {FILTERS.map((f) => (
+          <TouchableOpacity
+            key={f.key}
+            style={[styles.filterTab, filter === f.key && styles.filterTabActive]}
+            onPress={() => setFilter(f.key)}
+          >
+            <Text style={[styles.filterTabText, filter === f.key && styles.filterTabTextActive]}>
+              {f.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} />
+        <ActivityIndicator style={{ marginTop: 40 }} color={theme.colors.primary} />
       ) : (
-        <FlatList
-          data={transactions}
+        <SectionList
+          sections={sections}
           keyExtractor={(item) => item.id}
-          renderItem={renderItem}
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+            </View>
+          )}
+          renderItem={({ item }) => (
+            <View style={styles.row}>
+              <View style={[styles.typeDot, { backgroundColor: TYPE_COLORS[item.type as TransactionType] }]} />
+              <View style={styles.rowInfo}>
+                <Text style={styles.rowDescription} numberOfLines={1}>
+                  {item.description ?? TYPE_LABELS[item.type as TransactionType]}
+                </Text>
+                {getCategoryName(item.category_id) && (
+                  <Text style={styles.rowCategory}>{getCategoryName(item.category_id)}</Text>
+                )}
+              </View>
+              <View style={styles.rowRight}>
+                <Text style={[styles.rowAmount, { color: TYPE_COLORS[item.type as TransactionType] }]}>
+                  {formatAmount(item.type as TransactionType, item.amount)}
+                </Text>
+                <Text style={styles.rowDate}>{formatDate(item.transacted_at)}</Text>
+              </View>
+              <View style={styles.rowActions}>
+                <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
+                  <Text style={styles.editBtnText}>수정</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
+                  <Text style={styles.deleteBtnText}>삭제</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
           ListEmptyComponent={
             <Text style={styles.empty}>거래 내역이 없습니다. 추가해보세요!</Text>
           }
+          stickySectionHeadersEnabled={false}
         />
       )}
 
@@ -350,70 +406,112 @@ export default function TransactionListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: theme.colors.surface },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    backgroundColor: theme.colors.bg,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: theme.colors.border,
   },
-  title: { fontSize: 20, fontWeight: "bold" },
-  addBtn: { backgroundColor: "#4F46E5", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  addBtnText: { color: "#fff", fontWeight: "600" },
+  title: { ...theme.typography.h2, color: theme.colors.text.primary },
+  addBtn: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: theme.radius.sm,
+  },
+  addBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+  filterScroll: { backgroundColor: theme.colors.bg, maxHeight: 52 },
+  filterContent: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    gap: theme.spacing.sm,
+  },
+  filterTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  filterTabActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  filterTabText: { fontSize: 14, color: theme.colors.text.secondary, fontWeight: "500" },
+  filterTabTextActive: { color: "#fff", fontWeight: "700" },
+  sectionHeader: {
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.colors.text.secondary,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 14,
+    backgroundColor: theme.colors.bg,
     borderBottomWidth: 1,
-    borderBottomColor: "#f5f5f5",
+    borderBottomColor: theme.colors.border,
   },
-  rowLeft: { width: 52, marginRight: 8 },
-  rowType: { fontSize: 12, fontWeight: "600" },
-  rowDate: { fontSize: 11, color: "#999", marginTop: 2 },
+  typeDot: { width: 10, height: 10, borderRadius: 5, marginRight: theme.spacing.sm },
   rowInfo: { flex: 1 },
-  rowDescription: { fontSize: 15, color: "#111" },
-  rowCategory: { fontSize: 12, color: "#888", marginTop: 2 },
-  rowAmount: { fontSize: 15, fontWeight: "600", marginRight: 4 },
-  editBtn: { paddingHorizontal: 8, paddingVertical: 6 },
-  editBtnText: { color: "#4F46E5", fontSize: 13 },
-  deleteBtn: { paddingHorizontal: 8, paddingVertical: 6 },
-  deleteBtnText: { color: "#ef4444", fontSize: 13 },
-  empty: { textAlign: "center", color: "#999", marginTop: 60, fontSize: 15 },
+  rowDescription: { fontSize: 15, fontWeight: "600", color: theme.colors.text.primary },
+  rowCategory: { ...theme.typography.caption, color: theme.colors.text.secondary, marginTop: 2 },
+  rowRight: { alignItems: "flex-end", marginRight: theme.spacing.sm },
+  rowAmount: { fontSize: 15, fontWeight: "600" },
+  rowDate: { ...theme.typography.caption, color: theme.colors.text.hint, marginTop: 2 },
+  rowActions: { flexDirection: "row", gap: 4 },
+  editBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  editBtnText: { color: theme.colors.primary, fontSize: 13 },
+  deleteBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  deleteBtnText: { color: theme.colors.expense, fontSize: 13 },
+  empty: {
+    textAlign: "center",
+    color: theme.colors.text.hint,
+    marginTop: 60,
+    fontSize: 15,
+  },
   // 모달
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
   sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 24,
+    backgroundColor: theme.colors.bg,
+    borderTopLeftRadius: theme.radius.lg,
+    borderTopRightRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
     maxHeight: "90%",
   },
-  sheetTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 20 },
-  label: { fontSize: 13, color: "#666", marginBottom: 6, marginTop: 14 },
+  sheetTitle: { ...theme.typography.h2, color: theme.colors.text.primary, marginBottom: 20 },
+  label: { ...theme.typography.caption, color: theme.colors.text.secondary, marginBottom: 6, marginTop: 14 },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 15,
+    color: theme.colors.text.primary,
   },
   typeRow: { flexDirection: "row", gap: 8 },
   typeBtn: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: theme.colors.border,
     alignItems: "center",
   },
-  typeBtnText: { fontSize: 14, color: "#555" },
-  categorySelector: { justifyContent: "center" },
-  categorySelectorText: { fontSize: 15, color: "#111" },
-  categorySelectorPlaceholder: { fontSize: 15, color: "#aaa" },
+  typeBtnText: { fontSize: 14, color: theme.colors.text.secondary },
   categoryList: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   categoryChip: {
     flexDirection: "row",
@@ -422,27 +520,27 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: theme.colors.border,
   },
-  categoryChipSelected: { borderColor: "#4F46E5", backgroundColor: "#EEF2FF" },
+  categoryChipSelected: { borderColor: theme.colors.primary, backgroundColor: "#EEF5FF" },
   categoryChipDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  categoryChipText: { fontSize: 13, color: "#555" },
-  categoryChipSelectedText: { color: "#4F46E5", fontWeight: "600" },
+  categoryChipText: { fontSize: 13, color: theme.colors.text.secondary },
+  categoryChipSelectedText: { color: theme.colors.primary, fontWeight: "600" },
   sheetActions: { flexDirection: "row", gap: 10, marginTop: 24, marginBottom: 8 },
   cancelBtn: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 8,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: theme.colors.border,
     alignItems: "center",
   },
-  cancelBtnText: { color: "#555", fontSize: 15 },
+  cancelBtnText: { color: theme.colors.text.secondary, fontSize: 15 },
   submitBtn: {
     flex: 2,
     paddingVertical: 14,
-    borderRadius: 8,
-    backgroundColor: "#4F46E5",
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.primary,
     alignItems: "center",
   },
   submitBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
