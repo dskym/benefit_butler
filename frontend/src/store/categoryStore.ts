@@ -29,22 +29,29 @@ export const useCategoryStore = create<CategoryState>((set) => ({
   isLoading: false,
 
   fetchCategories: async () => {
-    // TODO: GET /categories/
-    throw new Error("Not implemented");
+    set({ isLoading: true });
+    try {
+      const { data } = await apiClient.get("/categories/");
+      set({ categories: data });
+    } finally {
+      set({ isLoading: false });
+    }
   },
 
-  createCategory: async (data) => {
-    // TODO: POST /categories/
-    throw new Error("Not implemented");
+  createCategory: async (payload) => {
+    const { data } = await apiClient.post("/categories/", payload);
+    set((s) => ({ categories: [data, ...s.categories] }));
   },
 
-  updateCategory: async (id, data) => {
-    // TODO: PUT /categories/:id
-    throw new Error("Not implemented");
+  updateCategory: async (id, payload) => {
+    const { data } = await apiClient.put(`/categories/${id}`, payload);
+    set((s) => ({
+      categories: s.categories.map((c) => (c.id === id ? data : c)),
+    }));
   },
 
   deleteCategory: async (id) => {
-    // TODO: DELETE /categories/:id
-    throw new Error("Not implemented");
+    await apiClient.delete(`/categories/${id}`);
+    set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
   },
 }));
