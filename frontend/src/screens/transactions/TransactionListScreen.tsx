@@ -410,9 +410,6 @@ export default function TransactionListScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.surface },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.md,
     backgroundColor: theme.colors.bg,
