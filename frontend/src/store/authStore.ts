@@ -12,27 +12,47 @@ interface AuthState {
   fetchMe: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isLoading: false,
 
   login: async (email, password) => {
-    // TODO: POST /auth/login → saveToken → fetchMe
-    throw new Error("Not implemented");
+    set({ isLoading: true });
+    try {
+      const { data } = await apiClient.post("/auth/login", { email, password });
+      await saveToken(data.access_token);
+      const { data: user } = await apiClient.get("/auth/me");
+      set({ user });
+    } finally {
+      set({ isLoading: false });
+    }
   },
 
   register: async (email, password, name) => {
-    // TODO: POST /auth/register
-    throw new Error("Not implemented");
+    set({ isLoading: true });
+    try {
+      await apiClient.post("/auth/register", { email, password, name });
+      await get().login(email, password);
+    } finally {
+      set({ isLoading: false });
+    }
   },
 
   logout: async () => {
-    // TODO: clearToken → set({ user: null })
-    throw new Error("Not implemented");
+    await clearToken();
+    set({ user: null });
   },
 
   fetchMe: async () => {
-    // TODO: GET /auth/me → set({ user })
-    throw new Error("Not implemented");
+    set({ isLoading: true });
+    try {
+      const { data } = await apiClient.get("/auth/me");
+      set({ user: data });
+    } catch {
+      await clearToken();
+      set({ user: null });
+    } finally {
+      set({ isLoading: false });
+    }
   },
 }));

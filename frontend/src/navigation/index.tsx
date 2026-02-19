@@ -1,5 +1,5 @@
 // frontend/src/navigation/index.tsx
-import React from "react";
+import React, { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -9,6 +9,7 @@ import RegisterScreen from "../screens/auth/RegisterScreen";
 import DashboardScreen from "../screens/dashboard/DashboardScreen";
 import TransactionListScreen from "../screens/transactions/TransactionListScreen";
 import CategoryListScreen from "../screens/categories/CategoryListScreen";
+import { useAuthStore } from "../store/authStore";
 
 const AuthStack = createNativeStackNavigator();
 const MainTab = createBottomTabNavigator();
@@ -33,11 +34,17 @@ function MainNavigator() {
 }
 
 export default function RootNavigation() {
-  const isAuthenticated = false; // TODO: useAuthStore().user !== null
+  const { user, isLoading, fetchMe } = useAuthStore();
+
+  useEffect(() => {
+    fetchMe();
+  }, []);
+
+  if (isLoading) return null;
 
   return (
     <NavigationContainer>
-      {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
+      {user !== null ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
 }

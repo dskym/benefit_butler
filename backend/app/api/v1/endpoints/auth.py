@@ -1,6 +1,9 @@
 # backend/app/api/v1/endpoints/auth.py
-from fastapi import APIRouter, Depends, status
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -16,21 +19,26 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ):
-    # TODO: decode_token(credentials.credentials) → user_id
-    # TODO: auth_service.get_user_by_id(db, user_id)
-    raise NotImplementedError
+    try:
+        user_id_str = decode_token(credentials.credentials)
+    except JWTError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return auth_service.get_user_by_id(db, uuid.UUID(user_id_str))
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(data: UserCreate, db: Session = Depends(get_db)):
-    # TODO: auth_service.register_user(db, data)
-    raise NotImplementedError
+    return auth_service.register_user(db, data)
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(data: UserLogin, db: Session = Depends(get_db)):
-    # TODO: auth_service.authenticate_user(db, data.email, data.password)
-    raise NotImplementedError
+    token = auth_service.authenticate_user(db, data.email, data.password)
+    return TokenResponse(access_token=token)
 
 
 @router.get("/me", response_model=UserResponse)
