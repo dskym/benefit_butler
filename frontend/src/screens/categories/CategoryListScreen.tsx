@@ -204,31 +204,37 @@ export default function CategoryListScreen() {
         <SectionList
           sections={sections}
           keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          stickySectionHeadersEnabled={false}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
           renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeader}>
+            <View style={styles.sectionHeaderRow}>
               <View style={[styles.sectionDot, { backgroundColor: TYPE_COLORS[section.type] }]} />
-              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <Text style={styles.sectionLabel}>{section.title}</Text>
             </View>
           )}
-          renderItem={({ item }) => (
-            <View style={styles.row}>
-              <View style={[styles.colorDot, { backgroundColor: item.color ?? theme.colors.text.hint }]} />
-              <Text style={styles.rowName}>{item.name}</Text>
-              <View style={styles.rowActions}>
-                <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
-                  <Text style={styles.editBtnText}>수정</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
-                  <Text style={styles.deleteBtnText}>삭제</Text>
-                </TouchableOpacity>
+          renderSectionFooter={() => <View style={styles.sectionFooter} />}
+          renderItem={({ item, index, section }) => {
+            const isFirst = index === 0;
+            const isLast = index === section.data.length - 1;
+            return (
+              <View style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast]}>
+                <View style={[styles.colorDot, { backgroundColor: item.color ?? theme.colors.text.hint }]} />
+                <Text style={styles.rowName}>{item.name}</Text>
+                <View style={styles.rowActions}>
+                  <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
+                    <Text style={styles.editBtnText}>수정</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
+                    <Text style={styles.deleteBtnText}>삭제</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          )}
+            );
+          }}
           ListEmptyComponent={
             <Text style={styles.empty}>카테고리가 없습니다. 추가해보세요!</Text>
           }
-          stickySectionHeadersEnabled={false}
-          contentContainerStyle={{ paddingBottom: 80 }}
         />
       )}
 
@@ -249,24 +255,30 @@ export default function CategoryListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.surface },
-  sectionHeader: {
+  listContent: {
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.sm,
+    paddingBottom: 100,
+  },
+  sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    backgroundColor: theme.colors.surface,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.xs,
   },
   sectionDot: { width: 8, height: 8, borderRadius: 4, marginRight: theme.spacing.sm },
-  sectionTitle: { fontSize: 13, fontWeight: "700", color: theme.colors.text.secondary },
+  sectionLabel: { ...theme.typography.caption, fontWeight: "700", color: theme.colors.text.secondary },
+  sectionFooter: { height: theme.spacing.sm },
   row: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 14,
     backgroundColor: theme.colors.bg,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
   },
+  rowFirst: { borderTopLeftRadius: theme.radius.lg, borderTopRightRadius: theme.radius.lg },
+  rowLast: { borderBottomLeftRadius: theme.radius.lg, borderBottomRightRadius: theme.radius.lg },
+  separator: { height: 1, backgroundColor: theme.colors.border, marginHorizontal: theme.spacing.md },
   colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: theme.spacing.md },
   rowName: { flex: 1, fontSize: 16, color: theme.colors.text.primary },
   rowActions: { flexDirection: "row", gap: 4 },

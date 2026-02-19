@@ -290,16 +290,11 @@ export default function TransactionListScreen() {
   const getCategoryName = (categoryId: string | null) =>
     categories.find((c) => c.id === categoryId)?.name ?? null;
 
-  // 필터 적용
   const filtered = useMemo(
-    () =>
-      filter === "all"
-        ? transactions
-        : transactions.filter((t) => t.type === filter),
+    () => filter === "all" ? transactions : transactions.filter((t) => t.type === filter),
     [transactions, filter]
   );
 
-  // 월별 섹션 그룹화
   const sections = useMemo(() => {
     const sorted = [...filtered].sort(
       (a, b) => new Date(b.transacted_at).getTime() - new Date(a.transacted_at).getTime()
@@ -320,18 +315,12 @@ export default function TransactionListScreen() {
     { key: "transfer", label: "이체" },
   ];
 
-  return (
-    <View style={styles.container}>
-      {/* 헤더 */}
-      <View style={styles.header}>
-        <Text style={styles.title}>거래 내역</Text>
-      </View>
-
-      {/* 필터 탭 */}
+  const ListHeader = (
+    <View style={styles.listHeader}>
+      <Text style={styles.title}>거래 내역</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.filterScroll}
         contentContainerStyle={styles.filterContent}
       >
         {FILTERS.map((f) => (
@@ -346,53 +335,68 @@ export default function TransactionListScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+    </View>
+  );
 
+  return (
+    <View style={styles.container}>
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={theme.colors.primary} />
+        <ActivityIndicator style={{ marginTop: 80 }} color={theme.colors.primary} />
       ) : (
         <SectionList
           sections={sections}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={ListHeader}
+          contentContainerStyle={styles.listContent}
+          stickySectionHeadersEnabled={false}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
           renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
-            </View>
+            <Text style={styles.sectionLabel}>{section.title}</Text>
           )}
-          renderItem={({ item }) => (
-            <View style={styles.row}>
-              <View style={[styles.typeDot, { backgroundColor: TYPE_COLORS[item.type as TransactionType] }]} />
-              <View style={styles.rowInfo}>
-                <Text style={styles.rowDescription} numberOfLines={1}>
-                  {item.description ?? TYPE_LABELS[item.type as TransactionType]}
-                </Text>
-                {getCategoryName(item.category_id) && (
-                  <Text style={styles.rowCategory}>{getCategoryName(item.category_id)}</Text>
-                )}
+          renderSectionFooter={() => <View style={styles.sectionFooter} />}
+          renderItem={({ item, index, section }) => {
+            const isFirst = index === 0;
+            const isLast = index === section.data.length - 1;
+            return (
+              <View
+                style={[
+                  styles.row,
+                  isFirst && styles.rowFirst,
+                  isLast && styles.rowLast,
+                ]}
+              >
+                <View style={[styles.typeDot, { backgroundColor: TYPE_COLORS[item.type as TransactionType] }]} />
+                <View style={styles.rowInfo}>
+                  <Text style={styles.rowDescription} numberOfLines={1}>
+                    {item.description ?? TYPE_LABELS[item.type as TransactionType]}
+                  </Text>
+                  {getCategoryName(item.category_id) && (
+                    <Text style={styles.rowCategory}>{getCategoryName(item.category_id)}</Text>
+                  )}
+                </View>
+                <View style={styles.rowRight}>
+                  <Text style={[styles.rowAmount, { color: TYPE_COLORS[item.type as TransactionType] }]}>
+                    {formatAmount(item.type as TransactionType, item.amount)}
+                  </Text>
+                  <Text style={styles.rowDate}>{formatDate(item.transacted_at)}</Text>
+                </View>
+                <View style={styles.rowActions}>
+                  <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
+                    <Text style={styles.editBtnText}>수정</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
+                    <Text style={styles.deleteBtnText}>삭제</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-              <View style={styles.rowRight}>
-                <Text style={[styles.rowAmount, { color: TYPE_COLORS[item.type as TransactionType] }]}>
-                  {formatAmount(item.type as TransactionType, item.amount)}
-                </Text>
-                <Text style={styles.rowDate}>{formatDate(item.transacted_at)}</Text>
-              </View>
-              <View style={styles.rowActions}>
-                <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
-                  <Text style={styles.editBtnText}>수정</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
-                  <Text style={styles.deleteBtnText}>삭제</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
+            );
+          }}
           ListEmptyComponent={
             <Text style={styles.empty}>거래 내역이 없습니다. 추가해보세요!</Text>
           }
-          stickySectionHeadersEnabled={false}
         />
       )}
 
-      {/* 플로팅 추가 버튼 */}
       <TouchableOpacity style={styles.fab} onPress={openCreate} activeOpacity={0.85}>
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
@@ -409,14 +413,74 @@ export default function TransactionListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.surface },
-  header: {
+  listContent: {
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-    backgroundColor: theme.colors.bg,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    paddingBottom: 100,
   },
-  title: { ...theme.typography.h2, color: theme.colors.text.primary },
+  listHeader: {
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing.md,
+  },
+  title: { ...theme.typography.h1, color: theme.colors.text.primary, marginBottom: theme.spacing.md },
+  filterContent: {
+    gap: theme.spacing.sm,
+    paddingVertical: 2,
+  },
+  filterTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.bg,
+  },
+  filterTabActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  filterTabText: { fontSize: 14, color: theme.colors.text.secondary, fontWeight: "500" },
+  filterTabTextActive: { color: "#fff", fontWeight: "700" },
+  sectionLabel: {
+    ...theme.typography.caption,
+    fontWeight: "700",
+    color: theme.colors.text.secondary,
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.xs,
+  },
+  sectionFooter: { height: theme.spacing.sm },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 14,
+    backgroundColor: theme.colors.bg,
+  },
+  rowFirst: {
+    borderTopLeftRadius: theme.radius.lg,
+    borderTopRightRadius: theme.radius.lg,
+  },
+  rowLast: {
+    borderBottomLeftRadius: theme.radius.lg,
+    borderBottomRightRadius: theme.radius.lg,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: theme.colors.border,
+    marginHorizontal: theme.spacing.md,
+  },
+  typeDot: { width: 10, height: 10, borderRadius: 5, marginRight: theme.spacing.sm },
+  rowInfo: { flex: 1 },
+  rowDescription: { fontSize: 15, fontWeight: "600", color: theme.colors.text.primary },
+  rowCategory: { ...theme.typography.caption, color: theme.colors.text.secondary, marginTop: 2 },
+  rowRight: { alignItems: "flex-end", marginRight: theme.spacing.sm },
+  rowAmount: { fontSize: 15, fontWeight: "600" },
+  rowDate: { ...theme.typography.caption, color: theme.colors.text.hint, marginTop: 2 },
+  rowActions: { flexDirection: "row", gap: 4 },
+  editBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  editBtnText: { color: theme.colors.primary, fontSize: 13 },
+  deleteBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  deleteBtnText: { color: theme.colors.expense, fontSize: 13 },
+  empty: { textAlign: "center", color: theme.colors.text.hint, marginTop: 60, fontSize: 15 },
   fab: {
     position: "absolute",
     bottom: 28,
@@ -434,63 +498,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabText: { color: "#fff", fontSize: 28, fontWeight: "300", lineHeight: 32 },
-  filterScroll: { backgroundColor: theme.colors.bg, maxHeight: 52 },
-  filterContent: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    gap: theme.spacing.sm,
-  },
-  filterTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: theme.radius.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  filterTabActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  filterTabText: { fontSize: 14, color: theme.colors.text.secondary, fontWeight: "500" },
-  filterTabTextActive: { color: "#fff", fontWeight: "700" },
-  sectionHeader: {
-    backgroundColor: theme.colors.surface,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: theme.colors.text.secondary,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: 14,
-    backgroundColor: theme.colors.bg,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  typeDot: { width: 10, height: 10, borderRadius: 5, marginRight: theme.spacing.sm },
-  rowInfo: { flex: 1 },
-  rowDescription: { fontSize: 15, fontWeight: "600", color: theme.colors.text.primary },
-  rowCategory: { ...theme.typography.caption, color: theme.colors.text.secondary, marginTop: 2 },
-  rowRight: { alignItems: "flex-end", marginRight: theme.spacing.sm },
-  rowAmount: { fontSize: 15, fontWeight: "600" },
-  rowDate: { ...theme.typography.caption, color: theme.colors.text.hint, marginTop: 2 },
-  rowActions: { flexDirection: "row", gap: 4 },
-  editBtn: { paddingHorizontal: 8, paddingVertical: 4 },
-  editBtnText: { color: theme.colors.primary, fontSize: 13 },
-  deleteBtn: { paddingHorizontal: 8, paddingVertical: 4 },
-  deleteBtnText: { color: theme.colors.expense, fontSize: 13 },
-  empty: {
-    textAlign: "center",
-    color: theme.colors.text.hint,
-    marginTop: 60,
-    fontSize: 15,
-  },
   // 모달
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
   sheet: {
