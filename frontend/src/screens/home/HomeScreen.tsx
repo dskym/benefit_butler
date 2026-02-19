@@ -12,7 +12,6 @@ import { useNavigation } from "@react-navigation/native";
 import { useTransactionStore } from "../../store/transactionStore";
 import { useCategoryStore } from "../../store/categoryStore";
 import { theme } from "../../theme";
-import { Transaction } from "../../types";
 
 type TxType = "income" | "expense" | "transfer";
 
