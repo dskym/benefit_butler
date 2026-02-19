@@ -33,22 +33,29 @@ export const useTransactionStore = create<TransactionState>((set) => ({
   isLoading: false,
 
   fetchTransactions: async () => {
-    // TODO: GET /transactions/
-    throw new Error("Not implemented");
+    set({ isLoading: true });
+    try {
+      const { data } = await apiClient.get("/transactions/");
+      set({ transactions: data });
+    } finally {
+      set({ isLoading: false });
+    }
   },
 
-  createTransaction: async (data) => {
-    // TODO: POST /transactions/
-    throw new Error("Not implemented");
+  createTransaction: async (payload) => {
+    const { data } = await apiClient.post("/transactions/", payload);
+    set((s) => ({ transactions: [data, ...s.transactions] }));
   },
 
-  updateTransaction: async (id, data) => {
-    // TODO: PUT /transactions/:id
-    throw new Error("Not implemented");
+  updateTransaction: async (id, payload) => {
+    const { data } = await apiClient.put(`/transactions/${id}`, payload);
+    set((s) => ({
+      transactions: s.transactions.map((t) => (t.id === id ? data : t)),
+    }));
   },
 
   deleteTransaction: async (id) => {
-    // TODO: DELETE /transactions/:id
-    throw new Error("Not implemented");
+    await apiClient.delete(`/transactions/${id}`);
+    set((s) => ({ transactions: s.transactions.filter((t) => t.id !== id) }));
   },
 }));

@@ -1,6 +1,8 @@
 # backend/app/services/transaction.py
 import uuid
 
+from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.transaction import Transaction
@@ -8,25 +10,51 @@ from app.schemas.transaction import TransactionCreate, TransactionUpdate
 
 
 def list_transactions(db: Session, user_id: uuid.UUID) -> list[Transaction]:
-    # TODO: filter by user_id, order by transacted_at desc
-    raise NotImplementedError
+    return list(
+        db.scalars(
+            select(Transaction)
+            .where(Transaction.user_id == user_id)
+            .order_by(Transaction.transacted_at.desc())
+        ).all()
+    )
 
 
 def create_transaction(db: Session, user_id: uuid.UUID, data: TransactionCreate) -> Transaction:
-    # TODO: create and persist Transaction
-    raise NotImplementedError
+    transaction = Transaction(
+        user_id=user_id,
+        category_id=data.category_id,
+        type=data.type,
+        amount=data.amount,
+        description=data.description,
+        transacted_at=data.transacted_at,
+    )
+    db.add(transaction)
+    db.commit()
+    db.refresh(transaction)
+    return transaction
 
 
 def get_transaction(db: Session, user_id: uuid.UUID, tx_id: uuid.UUID) -> Transaction:
-    # TODO: fetch, verify ownership, or raise 404
-    raise NotImplementedError
+    transaction = db.scalar(
+        select(Transaction).where(Transaction.id == tx_id, Transaction.user_id == user_id)
+    )
+    if transaction is None:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    return transaction
 
 
-def update_transaction(db: Session, user_id: uuid.UUID, tx_id: uuid.UUID, data: TransactionUpdate) -> Transaction:
-    # TODO: fetch, patch fields, commit
-    raise NotImplementedError
+def update_transaction(
+    db: Session, user_id: uuid.UUID, tx_id: uuid.UUID, data: TransactionUpdate
+) -> Transaction:
+    transaction = get_transaction(db, user_id, tx_id)
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(transaction, field, value)
+    db.commit()
+    db.refresh(transaction)
+    return transaction
 
 
 def delete_transaction(db: Session, user_id: uuid.UUID, tx_id: uuid.UUID) -> None:
-    # TODO: fetch, verify ownership, delete
-    raise NotImplementedError
+    transaction = get_transaction(db, user_id, tx_id)
+    db.delete(transaction)
+    db.commit()
