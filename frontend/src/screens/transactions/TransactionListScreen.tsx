@@ -325,9 +325,6 @@ export default function TransactionListScreen() {
       {/* 헤더 */}
       <View style={styles.header}>
         <Text style={styles.title}>거래 내역</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
-          <Text style={styles.addBtnText}>+ 추가</Text>
-        </TouchableOpacity>
       </View>
 
       {/* 필터 탭 */}
@@ -395,6 +392,11 @@ export default function TransactionListScreen() {
         />
       )}
 
+      {/* 플로팅 추가 버튼 */}
+      <TouchableOpacity style={styles.fab} onPress={openCreate} activeOpacity={0.85}>
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
+
       <FormModal
         visible={modalVisible}
         initial={editing}
@@ -418,13 +420,23 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   title: { ...theme.typography.h2, color: theme.colors.text.primary },
-  addBtn: {
+  fab: {
+    position: "absolute",
+    bottom: 28,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: theme.colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: theme.radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  addBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+  fabText: { color: "#fff", fontSize: 28, fontWeight: "300", lineHeight: 32 },
   filterScroll: { backgroundColor: theme.colors.bg, maxHeight: 52 },
   filterContent: {
     paddingHorizontal: theme.spacing.md,
