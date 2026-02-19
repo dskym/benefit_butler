@@ -2,7 +2,9 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
-const BASE_URL = "http://localhost:8000/api/v1";
+// iOS Simulator는 localhost 가능, Android 에뮬레이터는 10.0.2.2, 실기기는 실제 IP 필요
+// .env.local 파일에 EXPO_PUBLIC_API_URL 설정 (예: http://192.168.x.x:8000/api/v1)
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 const TOKEN_KEY = "access_token";
 
 export const apiClient = axios.create({ baseURL: BASE_URL });
