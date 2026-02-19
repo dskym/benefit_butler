@@ -11,9 +11,7 @@ import { PieChart, BarChart } from "react-native-gifted-charts";
 import { useNavigation } from "@react-navigation/native";
 import { useTransactionStore } from "../../store/transactionStore";
 import { useCategoryStore } from "../../store/categoryStore";
-import { useAuthStore } from "../../store/authStore";
 import { theme } from "../../theme";
-import { Transaction } from "../../types";
 
 type TxType = "income" | "expense" | "transfer";
 
@@ -49,9 +47,10 @@ function monthLabel(date: Date): string {
   return `${String(date.getMonth() + 1)}월`;
 }
 
+const WEEKDAYS = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
-  const { user } = useAuthStore();
   const { transactions, fetchTransactions } = useTransactionStore();
   const { categories, fetchCategories } = useCategoryStore();
 
@@ -137,8 +136,11 @@ export default function HomeScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       {/* 헤더 */}
       <View style={styles.header}>
-        <Text style={styles.greeting}>{user?.name}님, 안녕하세요</Text>
-        <Text style={styles.subTitle}>{now.getFullYear()}년 {now.getMonth() + 1}월</Text>
+        <Text style={styles.headerWeekday}>{WEEKDAYS[now.getDay()]}</Text>
+        <Text style={styles.headerDate}>
+          {now.getMonth() + 1}월 {now.getDate()}일
+        </Text>
+        <Text style={styles.headerYear}>{now.getFullYear()}</Text>
       </View>
 
       {/* 이번 달 요약 카드 */}
@@ -272,14 +274,23 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.surface },
   content: { padding: theme.spacing.md, paddingBottom: theme.spacing.xl },
   header: { marginBottom: theme.spacing.md, paddingTop: theme.spacing.lg },
-  greeting: {
-    ...theme.typography.h1,
-    color: theme.colors.text.primary,
+  headerWeekday: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.colors.primary,
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
-  subTitle: {
-    ...theme.typography.caption,
-    color: theme.colors.text.secondary,
-    marginTop: theme.spacing.xs,
+  headerDate: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: theme.colors.text.primary,
+    letterSpacing: -0.5,
+  },
+  headerYear: {
+    fontSize: 13,
+    color: theme.colors.text.hint,
+    marginTop: 2,
   },
   card: {
     backgroundColor: theme.colors.bg,
