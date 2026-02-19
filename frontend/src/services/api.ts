@@ -14,13 +14,15 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Response interceptor: 401 처리
+// Response interceptor: 401 처리 → 토큰 제거 + 인증 상태 초기화
 apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
     if (error.response?.status === 401) {
       await SecureStore.deleteItemAsync(TOKEN_KEY);
-      // TODO: navigate to login screen
+      // 동적 import로 circular dependency 없이 스토어 상태 초기화
+      const { useAuthStore } = await import("../store/authStore");
+      useAuthStore.setState({ user: null });
     }
     return Promise.reject(error);
   }
