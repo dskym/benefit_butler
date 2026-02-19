@@ -8,20 +8,14 @@ from passlib.context import CryptContext
 
 from app.core.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def _prehash(password: str) -> str:
-    """SHA-256 prehash to keep input under bcrypt's 72-byte limit."""
-    return base64.b64encode(hashlib.sha256(password.encode()).digest()).decode()
-
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(_prehash(password))
+    return pwd_context.hash(password)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(_prehash(plain), hashed)
+    return pwd_context.verify(plain, hashed)
 
 
 def create_access_token(subject: str) -> str:
