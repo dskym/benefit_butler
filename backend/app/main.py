@@ -13,7 +13,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # TODO: restrict in production
-    allow_credentials=True,
+    allow_credentials=False,  # credentials=True + origins=* 는 CORS 스펙 위반
     allow_methods=["*"],
     allow_headers=["*"],
 )
