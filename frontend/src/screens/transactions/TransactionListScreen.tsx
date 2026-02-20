@@ -91,7 +91,7 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
     initial?.type === "income" ? "income" : "expense";
 
   const [type, setType] = useState<"income" | "expense">(defaultType);
-  const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
+  const [amount, setAmount] = useState(initial ? String(Math.round(Number(initial.amount))) : "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [categoryId, setCategoryId] = useState(initial?.category_id ?? "");
   const [date, setDate] = useState(
@@ -104,7 +104,7 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
   useEffect(() => {
     if (visible) {
       setType(initial?.type === "income" ? "income" : "expense");
-      setAmount(initial ? String(initial.amount) : "");
+      setAmount(initial ? String(Math.round(Number(initial.amount))) : "");
       setDescription(initial?.description ?? "");
       setCategoryId(initial?.category_id ?? "");
       setDate(
