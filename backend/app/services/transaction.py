@@ -27,6 +27,8 @@ def create_transaction(db: Session, user_id: uuid.UUID, data: TransactionCreate)
         amount=data.amount,
         description=data.description,
         transacted_at=data.transacted_at,
+        payment_type=data.payment_type,
+        user_card_id=data.user_card_id,
     )
     db.add(transaction)
     db.commit()

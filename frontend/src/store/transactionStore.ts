@@ -9,6 +9,8 @@ interface TransactionCreate {
   description?: string;
   category_id?: string;
   transacted_at: string;
+  payment_type?: "cash" | "credit_card" | "debit_card" | "bank";
+  user_card_id?: string;
 }
 
 interface TransactionUpdate {
@@ -17,6 +19,8 @@ interface TransactionUpdate {
   description?: string;
   category_id?: string;
   transacted_at?: string;
+  payment_type?: "cash" | "credit_card" | "debit_card" | "bank";
+  user_card_id?: string;
 }
 
 interface TransactionState {

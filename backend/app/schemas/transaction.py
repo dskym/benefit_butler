@@ -12,6 +12,8 @@ class TransactionCreate(BaseModel):
     description: str | None = None
     category_id: uuid.UUID | None = None
     transacted_at: datetime
+    payment_type: str | None = None  # "cash" | "credit_card" | "debit_card" | "bank"
+    user_card_id: uuid.UUID | None = None
 
 
 class TransactionUpdate(BaseModel):
@@ -20,6 +22,8 @@ class TransactionUpdate(BaseModel):
     description: str | None = None
     category_id: uuid.UUID | None = None
     transacted_at: datetime | None = None
+    payment_type: str | None = None
+    user_card_id: uuid.UUID | None = None
 
 
 class TransactionResponse(BaseModel):
@@ -32,5 +36,7 @@ class TransactionResponse(BaseModel):
     transacted_at: datetime
     created_at: datetime
     updated_at: datetime
+    payment_type: str | None
+    user_card_id: uuid.UUID | None
 
     model_config = {"from_attributes": True}
