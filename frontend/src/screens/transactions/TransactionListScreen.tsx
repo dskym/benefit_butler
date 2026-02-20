@@ -67,13 +67,6 @@ function formatAmount(type: string, amount: number): string {
   return `${formatted}원`;
 }
 
-function formatSummaryAmount(amount: number): string {
-  if (amount >= 10000) {
-    const man = amount / 10000;
-    return man % 1 === 0 ? `${man}만` : `${man.toFixed(1)}만`;
-  }
-  return amount.toLocaleString("ko-KR");
-}
 
 // ── FormModal ─────────────────────────────────────────────
 
@@ -491,19 +484,12 @@ export default function TransactionListScreen() {
         <View style={styles.summaryBar}>
           <Text style={styles.summaryDateText}>{selectedDayLabel}</Text>
           <View style={styles.summaryAmounts}>
-            {daySummary.income > 0 && (
-              <Text style={[styles.summaryAmount, { color: theme.colors.income }]}>
-                +{formatSummaryAmount(daySummary.income)}
-              </Text>
-            )}
-            {daySummary.expense > 0 && (
-              <Text style={[styles.summaryAmount, { color: theme.colors.expense }]}>
-                -{formatSummaryAmount(daySummary.expense)}
-              </Text>
-            )}
-            {daySummary.income === 0 && daySummary.expense === 0 && (
-              <Text style={styles.summaryEmpty}>내역 없음</Text>
-            )}
+            <Text style={[styles.summaryAmount, { color: theme.colors.income }]}>
+              +{daySummary.income.toLocaleString("ko-KR")}원
+            </Text>
+            <Text style={[styles.summaryAmount, { color: theme.colors.expense }]}>
+              -{daySummary.expense.toLocaleString("ko-KR")}원
+            </Text>
           </View>
         </View>
       </View>
