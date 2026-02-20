@@ -39,6 +39,7 @@ export interface Transaction {
   updated_at: string;
   payment_type: "cash" | "credit_card" | "debit_card" | "bank" | null;
   user_card_id: string | null;
+  is_favorite?: boolean;
 }
 
 export interface TokenResponse {

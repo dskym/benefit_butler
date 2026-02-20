@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.auth import get_current_user
 from app.core.database import get_db
-from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse
+from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse, FavoritePatch
 import app.services.transaction as transaction_service
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
@@ -30,6 +30,11 @@ def get_transaction(tx_id: uuid.UUID, db: Session = Depends(get_db), current_use
 @router.put("/{tx_id}", response_model=TransactionResponse)
 def update_transaction(tx_id: uuid.UUID, data: TransactionUpdate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     return transaction_service.update_transaction(db, current_user.id, tx_id, data)
+
+
+@router.patch("/{tx_id}/favorite", response_model=TransactionResponse)
+def set_favorite(tx_id: uuid.UUID, data: FavoritePatch, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    return transaction_service.set_favorite(db, current_user.id, tx_id, data.is_favorite)
 
 
 @router.delete("/{tx_id}", status_code=status.HTTP_204_NO_CONTENT)

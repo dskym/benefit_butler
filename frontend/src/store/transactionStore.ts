@@ -30,6 +30,7 @@ interface TransactionState {
   createTransaction: (data: TransactionCreate) => Promise<void>;
   updateTransaction: (id: string, data: TransactionUpdate) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
+  toggleFavorite: (id: string, isFavorite: boolean) => Promise<void>;
 }
 
 export const useTransactionStore = create<TransactionState>((set) => ({
@@ -61,5 +62,14 @@ export const useTransactionStore = create<TransactionState>((set) => ({
   deleteTransaction: async (id) => {
     await apiClient.delete(`/transactions/${id}`);
     set((s) => ({ transactions: s.transactions.filter((t) => t.id !== id) }));
+  },
+
+  toggleFavorite: async (id, isFavorite) => {
+    const { data } = await apiClient.patch(`/transactions/${id}/favorite`, {
+      is_favorite: isFavorite,
+    });
+    set((s) => ({
+      transactions: s.transactions.map((t) => (t.id === id ? data : t)),
+    }));
   },
 }));
