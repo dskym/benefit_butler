@@ -7,7 +7,6 @@ import { Ionicons } from "@expo/vector-icons";
 
 import LoginScreen from "../screens/auth/LoginScreen";
 import RegisterScreen from "../screens/auth/RegisterScreen";
-import HomeScreen from "../screens/home/HomeScreen";
 import TransactionListScreen from "../screens/transactions/TransactionListScreen";
 import AnalysisScreen from "../screens/analysis/AnalysisScreen";
 import SettingsScreen from "../screens/settings/SettingsScreen";
@@ -76,10 +75,8 @@ function MainNavigator() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap;
-          if (route.name === "홈") {
-            iconName = focused ? "home" : "home-outline";
-          } else if (route.name === "거래") {
-            iconName = focused ? "swap-horizontal" : "swap-horizontal-outline";
+          if (route.name === "가계부") {
+            iconName = focused ? "list" : "list-outline";
           } else if (route.name === "분석") {
             iconName = focused ? "bar-chart" : "bar-chart-outline";
           } else {
@@ -89,8 +86,7 @@ function MainNavigator() {
         },
       })}
     >
-      <MainTab.Screen name="홈" component={HomeScreen} />
-      <MainTab.Screen name="거래" component={TransactionListScreen} />
+      <MainTab.Screen name="가계부" component={TransactionListScreen} />
       <MainTab.Screen name="분석" component={AnalysisScreen} />
       <MainTab.Screen name="설정" component={SettingsNavigator} />
     </MainTab.Navigator>

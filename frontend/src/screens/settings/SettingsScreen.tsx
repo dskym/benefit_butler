@@ -33,11 +33,6 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      {/* 헤더 */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>설정</Text>
-      </View>
-
       {/* 프로필 카드 */}
       <View style={styles.profileCard}>
         <View style={styles.avatar}>
