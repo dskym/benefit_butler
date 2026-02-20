@@ -454,9 +454,17 @@ export default function TransactionListScreen() {
           <TouchableOpacity style={styles.monthNavBtn} onPress={prevMonth} activeOpacity={0.7}>
             <Text style={styles.monthNavArrow}>‹</Text>
           </TouchableOpacity>
-          <Text style={styles.monthNavTitle}>
-            {year}년 {month + 1}월
-          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedMonth(new Date());
+              setSelectedDay(today);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.monthNavTitle}>
+              {year}년 {month + 1}월
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.monthNavBtn} onPress={nextMonth} activeOpacity={0.7}>
             <Text style={styles.monthNavArrow}>›</Text>
           </TouchableOpacity>
