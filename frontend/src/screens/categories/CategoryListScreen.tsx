@@ -91,7 +91,7 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
 
             <Text style={styles.label}>종류</Text>
             <View style={styles.typeRow}>
-              {(["income", "expense", "transfer"] as CategoryType[]).map((t) => (
+              {(["income", "expense"] as CategoryType[]).map((t) => (
                 <TouchableOpacity
                   key={t}
                   style={[
@@ -196,6 +196,12 @@ export default function CategoryListScreen() {
       .filter((s) => s.data.length > 0);
   }, [categories]);
 
+  const canAddMore = useMemo(() => {
+    const incomeCount = categories.filter((c) => c.type === "income").length;
+    const expenseCount = categories.filter((c) => c.type === "expense").length;
+    return incomeCount < 30 || expenseCount < 30;
+  }, [categories]);
+
   return (
     <View style={styles.container}>
       {isLoading ? (
@@ -211,6 +217,12 @@ export default function CategoryListScreen() {
             <View style={styles.sectionHeaderRow}>
               <View style={[styles.sectionDot, { backgroundColor: TYPE_COLORS[section.type] }]} />
               <Text style={styles.sectionLabel}>{section.title}</Text>
+              <Text style={[
+                styles.sectionCount,
+                section.data.length >= 30 && { color: theme.colors.expense },
+              ]}>
+                {section.data.length}/30
+              </Text>
             </View>
           )}
           renderSectionFooter={() => <View style={styles.sectionFooter} />}
@@ -241,9 +253,11 @@ export default function CategoryListScreen() {
       )}
 
       {/* 플로팅 추가 버튼 */}
-      <TouchableOpacity style={styles.fab} onPress={openCreate} activeOpacity={0.85}>
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+      {canAddMore && (
+        <TouchableOpacity style={styles.fab} onPress={openCreate} activeOpacity={0.85}>
+          <Text style={styles.fabText}>+</Text>
+        </TouchableOpacity>
+      )}
 
       <FormModal
         visible={modalVisible}
@@ -265,8 +279,14 @@ const styles = StyleSheet.create({
   sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.xs,
+  },
+  sectionCount: {
+    ...theme.typography.caption,
+    color: theme.colors.text.hint,
+    fontWeight: "600",
   },
   sectionDot: { width: 8, height: 8, borderRadius: 4, marginRight: theme.spacing.sm },
   sectionLabel: { ...theme.typography.caption, fontWeight: "700", color: theme.colors.text.secondary },

@@ -2,7 +2,7 @@
 import uuid
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.category import Category
@@ -14,12 +14,24 @@ def list_categories(db: Session, user_id: uuid.UUID) -> list[Category]:
         db.scalars(
             select(Category)
             .where(Category.user_id == user_id)
-            .order_by(Category.created_at.desc())
+            .order_by(Category.is_default.desc(), Category.created_at.asc())
         ).all()
     )
 
 
 def create_category(db: Session, user_id: uuid.UUID, data: CategoryCreate) -> Category:
+    count = db.scalar(
+        select(func.count()).where(
+            Category.user_id == user_id,
+            Category.type == data.type,
+        )
+    )
+    if count >= 30:
+        label = "수입" if data.type == "income" else "지출"
+        raise HTTPException(
+            status_code=400,
+            detail=f"{label} 카테고리는 최대 30개까지 만들 수 있습니다.",
+        )
     category = Category(
         user_id=user_id,
         name=data.name,
