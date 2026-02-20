@@ -485,10 +485,10 @@ export default function TransactionListScreen() {
           <Text style={styles.summaryDateText}>{selectedDayLabel}</Text>
           <View style={styles.summaryAmounts}>
             <Text style={[styles.summaryAmount, { color: theme.colors.income }]}>
-              +{daySummary.income.toLocaleString("ko-KR")}원
+              수입 {daySummary.income.toLocaleString("ko-KR")}원
             </Text>
             <Text style={[styles.summaryAmount, { color: theme.colors.expense }]}>
-              -{daySummary.expense.toLocaleString("ko-KR")}원
+              지출 {daySummary.expense.toLocaleString("ko-KR")}원
             </Text>
           </View>
         </View>
