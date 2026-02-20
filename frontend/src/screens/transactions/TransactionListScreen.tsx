@@ -432,44 +432,60 @@ function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }
   );
 }
 
-// ── FavoritesRow ──────────────────────────────────────────
+// ── FavoritesSection ──────────────────────────────────────
 
-interface FavoritesRowProps {
+interface FavoritesSectionProps {
   favorites: Transaction[];
+  expanded: boolean;
+  onToggle: () => void;
   onPress: (fav: Transaction) => void;
 }
 
-function FavoritesRow({ favorites, onPress }: FavoritesRowProps) {
+function FavoritesSection({ favorites, expanded, onToggle, onPress }: FavoritesSectionProps) {
   const { categories } = useCategoryStore();
   if (favorites.length === 0) return null;
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.favRow}
-      contentContainerStyle={styles.favRowContent}
-    >
-      {favorites.map((fav) => {
+    <View style={styles.favSection}>
+      <TouchableOpacity
+        style={styles.favSectionHeader}
+        onPress={onToggle}
+        activeOpacity={0.7}
+      >
+        <View style={styles.favSectionTitle}>
+          <Text style={styles.favSectionTitleText}>★ 자주 쓰는 거래</Text>
+          <View style={styles.favBadge}>
+            <Text style={styles.favBadgeText}>{favorites.length}</Text>
+          </View>
+        </View>
+        <Text style={styles.favToggleText}>{expanded ? "∧" : "∨"}</Text>
+      </TouchableOpacity>
+      {expanded && favorites.map((fav) => {
         const category = categories.find((c) => c.id === fav.category_id);
         const typeColor = TYPE_COLORS[fav.type] ?? theme.colors.transfer;
         return (
           <TouchableOpacity
             key={fav.id}
-            style={styles.favChip}
+            style={styles.favItem}
             onPress={() => onPress(fav)}
-            activeOpacity={0.75}
+            activeOpacity={0.7}
           >
-            <View style={[styles.favChipDot, { backgroundColor: category?.color ?? typeColor }]} />
-            <Text style={styles.favChipLabel} numberOfLines={1}>
-              {fav.description ?? category?.name ?? (fav.type === "income" ? "수입" : "지출")}
-            </Text>
-            <Text style={styles.favChipAmount}>
-              {Math.round(Number(fav.amount)).toLocaleString("ko-KR")}원
+            <View style={[styles.typeDot, { backgroundColor: category?.color ?? typeColor }]} />
+            <View style={styles.rowInfo}>
+              <Text style={styles.rowDescription} numberOfLines={1}>
+                {fav.description ?? TYPE_LABELS[fav.type] ?? fav.type}
+              </Text>
+              {category && (
+                <Text style={styles.rowCategory}>{category.name}</Text>
+              )}
+            </View>
+            <Text style={[styles.rowAmount, { color: typeColor }]}>
+              {formatAmount(fav.type, fav.amount)}
             </Text>
           </TouchableOpacity>
         );
       })}
-    </ScrollView>
+      <View style={styles.favSectionDivider} />
+    </View>
   );
 }
 
