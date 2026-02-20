@@ -18,6 +18,14 @@ export interface Category {
   created_at: string;
 }
 
+export interface UserCard {
+  id: string;
+  user_id: string;
+  type: "credit_card" | "debit_card";
+  name: string;
+  created_at: string;
+}
+
 export interface Transaction {
   id: string;
   user_id: string;
@@ -28,6 +36,8 @@ export interface Transaction {
   transacted_at: string;
   created_at: string;
   updated_at: string;
+  payment_type: "cash" | "credit_card" | "debit_card" | "bank" | null;
+  user_card_id: string | null;
 }
 
 export interface TokenResponse {

@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useTransactionStore } from "../../store/transactionStore";
 import { useCategoryStore } from "../../store/categoryStore";
+import { useCardStore } from "../../store/cardStore";
 import { Transaction } from "../../types";
 import { theme } from "../../theme";
 
@@ -31,6 +32,13 @@ const TYPE_COLORS: Record<string, string> = {
   income: theme.colors.income,
   expense: theme.colors.expense,
   transfer: theme.colors.transfer,
+};
+
+const PAYMENT_LABELS: Record<string, string> = {
+  cash: "현금",
+  credit_card: "신용카드",
+  debit_card: "체크카드",
+  bank: "은행이체",
 };
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -80,12 +88,15 @@ interface FormModalProps {
     amount: string,
     description: string,
     categoryId: string,
-    date: string
+    date: string,
+    paymentType: string | null,
+    userCardId: string | null
   ) => Promise<void>;
 }
 
 function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormModalProps) {
   const { categories } = useCategoryStore();
+  const { cards, fetchCards, createCard } = useCardStore();
 
   const defaultType: "income" | "expense" =
     initial?.type === "income" ? "income" : "expense";
@@ -101,6 +112,12 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
   );
   const [loading, setLoading] = useState(false);
 
+  // Payment method state
+  const [paymentType, setPaymentType] = useState<string | null>(initial?.payment_type ?? null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(initial?.user_card_id ?? null);
+  const [newCardName, setNewCardName] = useState("");
+  const [showAddCard, setShowAddCard] = useState(false);
+
   useEffect(() => {
     if (visible) {
       setType(initial?.type === "income" ? "income" : "expense");
@@ -112,8 +129,39 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
           ? toLocalISODate(initial.transacted_at)
           : initialDate ?? todayKey()
       );
+      setPaymentType(initial?.payment_type ?? null);
+      setSelectedCardId(initial?.user_card_id ?? null);
+      setNewCardName("");
+      setShowAddCard(false);
+      fetchCards();
     }
   }, [visible, initial, initialDate]);
+
+  const handlePaymentTypeChange = (pt: string) => {
+    setPaymentType(pt);
+    // Reset card selection when switching away from card types
+    if (pt !== "credit_card" && pt !== "debit_card") {
+      setSelectedCardId(null);
+    }
+    setShowAddCard(false);
+  };
+
+  const handleAddCard = async () => {
+    const trimmed = newCardName.trim();
+    if (!trimmed) return;
+    if (!paymentType || (paymentType !== "credit_card" && paymentType !== "debit_card")) return;
+    try {
+      const newCard = await createCard({
+        type: paymentType as "credit_card" | "debit_card",
+        name: trimmed,
+      });
+      setSelectedCardId(newCard.id);
+      setNewCardName("");
+      setShowAddCard(false);
+    } catch (e: any) {
+      Alert.alert("오류", e.response?.data?.detail ?? "카드 추가에 실패했습니다.");
+    }
+  };
 
   const handleSubmit = async () => {
     if (!amount.trim() || isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -124,9 +172,13 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
       Alert.alert("오류", "날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)");
       return;
     }
+    if (!paymentType) {
+      Alert.alert("오류", "결제 수단을 선택해주세요.");
+      return;
+    }
     setLoading(true);
     try {
-      await onSubmit(type, amount.trim(), description.trim(), categoryId, date);
+      await onSubmit(type, amount.trim(), description.trim(), categoryId, date, paymentType, selectedCardId);
       onClose();
     } catch (e: any) {
       const msg = e.response?.data?.detail ?? "저장에 실패했습니다.";
@@ -137,6 +189,7 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
   };
 
   const filteredCategories = categories.filter((c) => c.type === type);
+  const filteredCards = cards.filter((c) => c.type === paymentType);
 
   const handleTypeChange = (newType: "income" | "expense") => {
     setType(newType);
@@ -147,6 +200,15 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
     { key: "income", label: "수입", color: theme.colors.income },
     { key: "expense", label: "지출", color: theme.colors.expense },
   ];
+
+  const PAYMENT_TYPES: { key: string; label: string }[] = [
+    { key: "cash", label: "현금" },
+    { key: "credit_card", label: "신용카드" },
+    { key: "debit_card", label: "체크카드" },
+    { key: "bank", label: "은행이체" },
+  ];
+
+  const showCardSection = paymentType === "credit_card" || paymentType === "debit_card";
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -243,6 +305,76 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
               )}
             </View>
 
+            {/* Payment method section */}
+            <Text style={styles.label}>결제 수단</Text>
+            <View style={styles.paymentRow}>
+              {PAYMENT_TYPES.map((pt) => (
+                <TouchableOpacity
+                  key={pt.key}
+                  style={[
+                    styles.paymentBtn,
+                    paymentType === pt.key && styles.paymentBtnActive,
+                  ]}
+                  onPress={() => handlePaymentTypeChange(pt.key)}
+                >
+                  <Text
+                    style={[
+                      styles.paymentBtnText,
+                      paymentType === pt.key && styles.paymentBtnTextActive,
+                    ]}
+                  >
+                    {pt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Card list — shown when credit or debit is selected */}
+            {showCardSection && (
+              <View style={styles.cardSection}>
+                {/* "카드 지정 안함" option */}
+                <TouchableOpacity
+                  style={styles.cardRow}
+                  onPress={() => setSelectedCardId(null)}
+                >
+                  <View style={[styles.radio, !selectedCardId && styles.radioSelected]} />
+                  <Text style={styles.cardRowText}>카드 지정 안함</Text>
+                </TouchableOpacity>
+
+                {filteredCards.map((card) => (
+                  <TouchableOpacity
+                    key={card.id}
+                    style={styles.cardRow}
+                    onPress={() => setSelectedCardId(card.id)}
+                  >
+                    <View style={[styles.radio, selectedCardId === card.id && styles.radioSelected]} />
+                    <Text style={styles.cardRowText}>{card.name}</Text>
+                  </TouchableOpacity>
+                ))}
+
+                {/* Add new card */}
+                {showAddCard ? (
+                  <View style={styles.addCardRow}>
+                    <TextInput
+                      style={[styles.input, styles.addCardInput]}
+                      value={newCardName}
+                      onChangeText={setNewCardName}
+                      placeholder="카드 이름 입력"
+                      placeholderTextColor={theme.colors.text.hint}
+                      autoFocus
+                    />
+                    <TouchableOpacity style={styles.addCardBtn} onPress={handleAddCard}>
+                      <Text style={styles.addCardBtnText}>추가</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity onPress={() => setShowAddCard(true)}>
+                    <Text style={styles.addCardLink}>+ 새 카드 추가...</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
             <View style={styles.sheetActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
                 <Text style={styles.cancelBtnText}>취소</Text>
@@ -278,6 +410,7 @@ export default function TransactionListScreen() {
     deleteTransaction,
   } = useTransactionStore();
   const { categories, fetchCategories } = useCategoryStore();
+  const { cards, fetchCards } = useCardStore();
 
   // Step 2: calendar state
   const today = useMemo(() => todayKey(), []);
@@ -291,6 +424,7 @@ export default function TransactionListScreen() {
   useEffect(() => {
     fetchTransactions();
     fetchCategories();
+    fetchCards();
   }, []);
 
   const year = selectedMonth.getFullYear();
@@ -383,7 +517,9 @@ export default function TransactionListScreen() {
     amount: string,
     description: string,
     categoryId: string,
-    date: string
+    date: string,
+    paymentType: string | null,
+    userCardId: string | null
   ) => {
     const payload = {
       type,
@@ -391,6 +527,8 @@ export default function TransactionListScreen() {
       description: description || undefined,
       category_id: categoryId || undefined,
       transacted_at: new Date(date).toISOString(),
+      payment_type: paymentType as "cash" | "credit_card" | "debit_card" | "bank" | undefined,
+      user_card_id: userCardId || undefined,
     };
     if (editing) {
       await updateTransaction(editing.id, payload);
@@ -401,6 +539,17 @@ export default function TransactionListScreen() {
 
   const getCategoryName = (categoryId: string | null) =>
     categories.find((c) => c.id === categoryId)?.name ?? null;
+
+  const getCardName = (cardId: string | null) =>
+    cards.find((c) => c.id === cardId)?.name ?? null;
+
+  const getPaymentLabel = (tx: Transaction): string | null => {
+    if (!tx.payment_type) return null;
+    if ((tx.payment_type === "credit_card" || tx.payment_type === "debit_card") && tx.user_card_id) {
+      return getCardName(tx.user_card_id) ?? PAYMENT_LABELS[tx.payment_type];
+    }
+    return PAYMENT_LABELS[tx.payment_type] ?? null;
+  };
 
   // Step 2: summary bar label
   const selectedDayLabel = useMemo(() => {
@@ -531,6 +680,7 @@ export default function TransactionListScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           renderItem={({ item }) => {
             const typeColor = TYPE_COLORS[item.type] ?? theme.colors.transfer;
+            const paymentLabel = getPaymentLabel(item);
             return (
               <TouchableOpacity
                 style={styles.row}
@@ -546,6 +696,9 @@ export default function TransactionListScreen() {
                     <Text style={styles.rowCategory}>
                       {getCategoryName(item.category_id)}
                     </Text>
+                  )}
+                  {paymentLabel && (
+                    <Text style={styles.rowPayment}>{paymentLabel}</Text>
                   )}
                 </View>
                 <Text style={[styles.rowAmount, { color: typeColor }]}>
@@ -719,6 +872,11 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
     marginTop: 2,
   },
+  rowPayment: {
+    ...theme.typography.caption,
+    color: theme.colors.text.hint,
+    marginTop: 1,
+  },
   rowAmount: { fontSize: 15, fontWeight: "600", marginRight: theme.spacing.sm },
   deleteBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   deleteBtnText: { color: theme.colors.expense, fontSize: 13 },
@@ -809,6 +967,74 @@ const styles = StyleSheet.create({
   categoryChipText: { fontSize: 13, color: theme.colors.text.secondary },
   categoryChipSelectedText: { color: theme.colors.primary, fontWeight: "600" },
   noCategoryText: { fontSize: 13, color: theme.colors.text.hint },
+
+  // Payment method
+  paymentRow: { flexDirection: "row", gap: 6, marginTop: 4 },
+  paymentBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: "center",
+  },
+  paymentBtnActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  paymentBtnText: { fontSize: 12, color: theme.colors.text.secondary },
+  paymentBtnTextActive: { color: "#fff", fontWeight: "600" },
+
+  // Card section
+  cardSection: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  cardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  radio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    marginRight: 10,
+  },
+  radioSelected: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primary,
+  },
+  cardRowText: {
+    fontSize: 14,
+    color: theme.colors.text.primary,
+  },
+  addCardLink: {
+    fontSize: 13,
+    color: theme.colors.primary,
+    paddingVertical: 10,
+  },
+  addCardRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  addCardInput: { flex: 1, marginBottom: 0 },
+  addCardBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.radius.sm,
+  },
+  addCardBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+
   sheetActions: { flexDirection: "row", gap: 10, marginTop: 24, marginBottom: 8 },
   cancelBtn: {
     flex: 1,
