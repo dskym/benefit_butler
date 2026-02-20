@@ -23,6 +23,7 @@ class CategoryResponse(BaseModel):
     name: str
     type: str
     color: str | None
+    is_default: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}

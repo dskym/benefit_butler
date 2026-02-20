@@ -14,6 +14,7 @@ export interface Category {
   name: string;
   type: "income" | "expense" | "transfer";
   color: string | null;
+  is_default: boolean;
   created_at: string;
 }
 

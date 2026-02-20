@@ -221,14 +221,16 @@ export default function CategoryListScreen() {
               <View style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast]}>
                 <View style={[styles.colorDot, { backgroundColor: item.color ?? theme.colors.text.hint }]} />
                 <Text style={styles.rowName}>{item.name}</Text>
-                <View style={styles.rowActions}>
-                  <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
-                    <Text style={styles.editBtnText}>수정</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
-                    <Text style={styles.deleteBtnText}>삭제</Text>
-                  </TouchableOpacity>
-                </View>
+                {!item.is_default && (
+                  <View style={styles.rowActions}>
+                    <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
+                      <Text style={styles.editBtnText}>수정</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
+                      <Text style={styles.deleteBtnText}>삭제</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             );
           }}

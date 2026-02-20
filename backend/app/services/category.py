@@ -45,6 +45,8 @@ def update_category(
     db: Session, user_id: uuid.UUID, category_id: uuid.UUID, data: CategoryUpdate
 ) -> Category:
     category = get_category(db, user_id, category_id)
+    if category.is_default:
+        raise HTTPException(status_code=403, detail="기본 카테고리는 수정할 수 없습니다.")
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(category, field, value)
     db.commit()
@@ -54,6 +56,8 @@ def update_category(
 
 def delete_category(db: Session, user_id: uuid.UUID, category_id: uuid.UUID) -> None:
     category = get_category(db, user_id, category_id)
+    if category.is_default:
+        raise HTTPException(status_code=403, detail="기본 카테고리는 삭제할 수 없습니다.")
     db.delete(category)
     db.commit()
 
@@ -83,5 +87,5 @@ DEFAULT_CATEGORIES: list[dict] = [
 
 def seed_default_categories(db: Session, user_id: uuid.UUID) -> None:
     for item in DEFAULT_CATEGORIES:
-        db.add(Category(user_id=user_id, **item))
+        db.add(Category(user_id=user_id, is_default=True, **item))
     db.commit()
