@@ -947,7 +947,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: theme.radius.lg,
     borderTopRightRadius: theme.radius.lg,
     padding: theme.spacing.lg,
-    maxHeight: "90%",
+    height: "90%",
   },
   sheetTitle: {
     ...theme.typography.h2,
