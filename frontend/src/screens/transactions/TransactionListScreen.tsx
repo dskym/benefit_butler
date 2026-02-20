@@ -514,6 +514,7 @@ export default function TransactionListScreen() {
   );
   const [contextTx, setContextTx] = useState<Transaction | null>(null);
   const [favoritePrefill, setFavoritePrefill] = useState<Transaction | null>(null);
+  const [favExpanded, setFavExpanded] = useState(true);
 
   // Step 2: calendar state
   const today = useMemo(() => todayKey(), []);
@@ -728,9 +729,6 @@ export default function TransactionListScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Favorites quick re-entry row */}
-      <FavoritesRow favorites={favorites} onPress={openFromFavorite} />
-
       {/* Step 2: Calendar section (fixed top) */}
       <View style={styles.calendarSection}>
         {/* Month navigator */}
@@ -800,6 +798,14 @@ export default function TransactionListScreen() {
           keyExtractor={(item) => item.id}
           style={styles.list}
           contentContainerStyle={styles.listContent}
+          ListHeaderComponent={
+            <FavoritesSection
+              favorites={favorites}
+              expanded={favExpanded}
+              onToggle={() => setFavExpanded((prev) => !prev)}
+              onPress={openFromFavorite}
+            />
+          }
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           renderItem={({ item }) => {
             const typeColor = TYPE_COLORS[item.type] ?? theme.colors.transfer;
