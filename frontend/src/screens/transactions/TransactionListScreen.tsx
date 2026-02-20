@@ -173,6 +173,7 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
               value={amount}
               onChangeText={setAmount}
               placeholder="예: 15000"
+              placeholderTextColor={theme.colors.text.hint}
               keyboardType="numeric"
             />
 
@@ -182,6 +183,7 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
               value={date}
               onChangeText={setDate}
               placeholder="2024-01-01"
+              placeholderTextColor={theme.colors.text.hint}
               autoCapitalize="none"
             />
 
@@ -191,6 +193,7 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
               value={description}
               onChangeText={setDescription}
               placeholder="예: 점심 식사"
+              placeholderTextColor={theme.colors.text.hint}
             />
 
             <Text style={styles.label}>카테고리 (선택)</Text>
