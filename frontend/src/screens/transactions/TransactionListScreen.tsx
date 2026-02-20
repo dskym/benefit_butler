@@ -136,6 +136,13 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
     }
   };
 
+  const filteredCategories = categories.filter((c) => c.type === type);
+
+  const handleTypeChange = (newType: "income" | "expense") => {
+    setType(newType);
+    setCategoryId("");
+  };
+
   const FORM_TYPES: { key: "income" | "expense"; label: string; color: string }[] = [
     { key: "income", label: "수입", color: theme.colors.income },
     { key: "expense", label: "지출", color: theme.colors.expense },
@@ -158,7 +165,7 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
                     styles.typeBtn,
                     type === t.key && { backgroundColor: t.color, borderColor: t.color },
                   ]}
-                  onPress={() => setType(t.key)}
+                  onPress={() => handleTypeChange(t.key)}
                 >
                   <Text style={[styles.typeBtnText, type === t.key && { color: "#fff" }]}>
                     {t.label}
@@ -206,7 +213,7 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
                   없음
                 </Text>
               </TouchableOpacity>
-              {categories.map((c) => (
+              {filteredCategories.map((c) => (
                 <TouchableOpacity
                   key={c.id}
                   style={[
@@ -229,6 +236,11 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
                   </Text>
                 </TouchableOpacity>
               ))}
+              {filteredCategories.length === 0 && (
+                <Text style={styles.noCategoryText}>
+                  {type === "income" ? "수입" : "지출"} 카테고리가 없습니다.
+                </Text>
+              )}
             </View>
 
             <View style={styles.sheetActions}>
@@ -796,6 +808,7 @@ const styles = StyleSheet.create({
   categoryChipDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   categoryChipText: { fontSize: 13, color: theme.colors.text.secondary },
   categoryChipSelectedText: { color: theme.colors.primary, fontWeight: "600" },
+  noCategoryText: { fontSize: 13, color: theme.colors.text.hint },
   sheetActions: { flexDirection: "row", gap: 10, marginTop: 24, marginBottom: 8 },
   cancelBtn: {
     flex: 1,
