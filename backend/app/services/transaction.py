@@ -60,3 +60,11 @@ def delete_transaction(db: Session, user_id: uuid.UUID, tx_id: uuid.UUID) -> Non
     transaction = get_transaction(db, user_id, tx_id)
     db.delete(transaction)
     db.commit()
+
+
+def set_favorite(db: Session, user_id: uuid.UUID, tx_id: uuid.UUID, is_favorite: bool) -> Transaction:
+    transaction = get_transaction(db, user_id, tx_id)
+    transaction.is_favorite = is_favorite
+    db.commit()
+    db.refresh(transaction)
+    return transaction
