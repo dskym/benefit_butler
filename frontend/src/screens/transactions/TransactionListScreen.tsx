@@ -3,9 +3,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Modal,
   Platform,
-  SectionList,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,50 +18,72 @@ import { useCategoryStore } from "../../store/categoryStore";
 import { Transaction } from "../../types";
 import { theme } from "../../theme";
 
-type TransactionType = "income" | "expense" | "transfer";
-type FilterType = "all" | TransactionType;
+// ── 상수 ─────────────────────────────────────────────────
 
-const TYPE_LABELS: Record<TransactionType, string> = {
+// Legacy: kept for display of existing transfer records
+const TYPE_LABELS: Record<string, string> = {
   income: "수입",
   expense: "지출",
   transfer: "이체",
 };
 
-const TYPE_COLORS: Record<TransactionType, string> = {
+const TYPE_COLORS: Record<string, string> = {
   income: theme.colors.income,
   expense: theme.colors.expense,
   transfer: theme.colors.transfer,
 };
 
-function formatAmount(type: TransactionType, amount: number): string {
-  const formatted = amount.toLocaleString("ko-KR");
-  if (type === "income") return `+${formatted}원`;
-  if (type === "expense") return `-${formatted}원`;
-  return `${formatted}원`;
-}
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-}
+// ── 유틸 ─────────────────────────────────────────────────
 
 function toLocalISODate(iso: string): string {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function sectionTitle(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
+function dateToKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// ── 폼 모달 ──────────────────────────────────────────────
+function todayKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// 달력 셀 배열: null = 앞 빈칸 패딩
+function buildCalendarDays(year: number, month: number): (Date | null)[] {
+  const firstDay = new Date(year, month, 1).getDay(); // 0=일
+  const lastDate = new Date(year, month + 1, 0).getDate();
+  const cells: (Date | null)[] = Array(firstDay).fill(null);
+  for (let d = 1; d <= lastDate; d++) cells.push(new Date(year, month, d));
+  return cells;
+}
+
+function formatAmount(type: string, amount: number): string {
+  const formatted = amount.toLocaleString("ko-KR");
+  if (type === "income") return `+${formatted}원`;
+  if (type === "expense") return `-${formatted}원`;
+  return `${formatted}원`;
+}
+
+function formatSummaryAmount(amount: number): string {
+  if (amount >= 10000) {
+    const man = amount / 10000;
+    return man % 1 === 0 ? `${man}만` : `${man.toFixed(1)}만`;
+  }
+  return amount.toLocaleString("ko-KR");
+}
+
+// ── FormModal ─────────────────────────────────────────────
+
 interface FormModalProps {
   visible: boolean;
   initial?: Transaction | null;
+  initialDate?: string;
   onClose: () => void;
   onSubmit: (
-    type: TransactionType,
+    type: "income" | "expense",
     amount: string,
     description: string,
     categoryId: string,
@@ -69,29 +91,36 @@ interface FormModalProps {
   ) => Promise<void>;
 }
 
-function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
+function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormModalProps) {
   const { categories } = useCategoryStore();
 
-  const [type, setType] = useState<TransactionType>((initial?.type as TransactionType) ?? "expense");
+  const defaultType: "income" | "expense" =
+    initial?.type === "income" ? "income" : "expense";
+
+  const [type, setType] = useState<"income" | "expense">(defaultType);
   const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [categoryId, setCategoryId] = useState(initial?.category_id ?? "");
   const [date, setDate] = useState(
-    initial ? toLocalISODate(initial.transacted_at) : toLocalISODate(new Date().toISOString())
+    initial
+      ? toLocalISODate(initial.transacted_at)
+      : initialDate ?? todayKey()
   );
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (visible) {
-      setType((initial?.type as TransactionType) ?? "expense");
+      setType(initial?.type === "income" ? "income" : "expense");
       setAmount(initial ? String(initial.amount) : "");
       setDescription(initial?.description ?? "");
       setCategoryId(initial?.category_id ?? "");
       setDate(
-        initial ? toLocalISODate(initial.transacted_at) : toLocalISODate(new Date().toISOString())
+        initial
+          ? toLocalISODate(initial.transacted_at)
+          : initialDate ?? todayKey()
       );
     }
-  }, [visible, initial]);
+  }, [visible, initial, initialDate]);
 
   const handleSubmit = async () => {
     if (!amount.trim() || isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -114,6 +143,11 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
     }
   };
 
+  const FORM_TYPES: { key: "income" | "expense"; label: string; color: string }[] = [
+    { key: "income", label: "수입", color: theme.colors.income },
+    { key: "expense", label: "지출", color: theme.colors.expense },
+  ];
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -121,19 +155,20 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={styles.sheetTitle}>{initial ? "내역 수정" : "내역 추가"}</Text>
 
+            {/* Step 1: type selector — income/expense only */}
             <Text style={styles.label}>종류</Text>
             <View style={styles.typeRow}>
-              {(["income", "expense", "transfer"] as TransactionType[]).map((t) => (
+              {FORM_TYPES.map((t) => (
                 <TouchableOpacity
-                  key={t}
+                  key={t.key}
                   style={[
                     styles.typeBtn,
-                    type === t && { backgroundColor: TYPE_COLORS[t], borderColor: TYPE_COLORS[t] },
+                    type === t.key && { backgroundColor: t.color, borderColor: t.color },
                   ]}
-                  onPress={() => setType(t)}
+                  onPress={() => setType(t.key)}
                 >
-                  <Text style={[styles.typeBtnText, type === t && { color: "#fff" }]}>
-                    {TYPE_LABELS[t]}
+                  <Text style={[styles.typeBtnText, type === t.key && { color: "#fff" }]}>
+                    {t.label}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -224,6 +259,7 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
 }
 
 // ── 메인 화면 ─────────────────────────────────────────────
+
 export default function TransactionListScreen() {
   const {
     transactions,
@@ -235,15 +271,82 @@ export default function TransactionListScreen() {
   } = useTransactionStore();
   const { categories, fetchCategories } = useCategoryStore();
 
+  // Step 2: calendar state
+  const today = useMemo(() => todayKey(), []);
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date());
+  const [selectedDay, setSelectedDay] = useState<string | null>(today);
+
+  // Step 4: modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
-  const [filter, setFilter] = useState<FilterType>("all");
 
   useEffect(() => {
     fetchTransactions();
     fetchCategories();
   }, []);
 
+  const year = selectedMonth.getFullYear();
+  const month = selectedMonth.getMonth(); // 0-indexed
+  const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
+
+  // Step 2: calendar cells array
+  const calendarDays = useMemo(() => buildCalendarDays(year, month), [year, month]);
+
+  // Step 2: dot map — date → { income, expense }
+  const txDayMap = useMemo(() => {
+    const map: Record<string, { income: boolean; expense: boolean }> = {};
+    transactions
+      .filter((t) => t.transacted_at.startsWith(monthKey))
+      .forEach((t) => {
+        const day = toLocalISODate(t.transacted_at);
+        if (!map[day]) map[day] = { income: false, expense: false };
+        if (t.type === "income") map[day].income = true;
+        if (t.type === "expense") map[day].expense = true;
+      });
+    return map;
+  }, [transactions, monthKey]);
+
+  // Step 3: filtered transaction list
+  const listTx = useMemo(() => {
+    const monthFiltered = transactions.filter((t) =>
+      t.transacted_at.startsWith(monthKey)
+    );
+    const dayFiltered = selectedDay
+      ? monthFiltered.filter((t) => toLocalISODate(t.transacted_at) === selectedDay)
+      : monthFiltered;
+    return [...dayFiltered].sort(
+      (a, b) => new Date(b.transacted_at).getTime() - new Date(a.transacted_at).getTime()
+    );
+  }, [transactions, monthKey, selectedDay]);
+
+  // Step 2: day summary bar data
+  const daySummary = useMemo(() => {
+    const income = listTx
+      .filter((t) => t.type === "income")
+      .reduce((s, t) => s + t.amount, 0);
+    const expense = listTx
+      .filter((t) => t.type === "expense")
+      .reduce((s, t) => s + t.amount, 0);
+    return { income, expense };
+  }, [listTx]);
+
+  // Month navigation — resets selectedDay
+  const prevMonth = () => {
+    setSelectedMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1));
+    setSelectedDay(null);
+  };
+
+  const nextMonth = () => {
+    setSelectedMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1));
+    setSelectedDay(null);
+  };
+
+  // Step 2: day press — same day re-tap deselects
+  const handleDayPress = (dateStr: string) => {
+    setSelectedDay((prev) => (prev === dateStr ? null : dateStr));
+  };
+
+  // Step 4: FAB opens create with selectedDay pre-filled
   const openCreate = () => {
     setEditing(null);
     setModalVisible(true);
@@ -254,6 +357,7 @@ export default function TransactionListScreen() {
     setModalVisible(true);
   };
 
+  // Step 3: delete handler
   const handleDelete = (item: Transaction) => {
     const doDelete = () => deleteTransaction(item.id);
     if (Platform.OS === "web") {
@@ -267,7 +371,7 @@ export default function TransactionListScreen() {
   };
 
   const handleSubmit = async (
-    type: TransactionType,
+    type: "income" | "expense",
     amount: string,
     description: string,
     categoryId: string,
@@ -290,120 +394,182 @@ export default function TransactionListScreen() {
   const getCategoryName = (categoryId: string | null) =>
     categories.find((c) => c.id === categoryId)?.name ?? null;
 
-  const filtered = useMemo(
-    () => filter === "all" ? transactions : transactions.filter((t) => t.type === filter),
-    [transactions, filter]
-  );
+  // Step 2: summary bar label
+  const selectedDayLabel = useMemo(() => {
+    if (!selectedDay) return `${month + 1}월 전체`;
+    const d = new Date(selectedDay);
+    return `${month + 1}월 ${d.getDate()}일 · ${WEEKDAYS[d.getDay()]}`;
+  }, [selectedDay, month]);
 
-  const sections = useMemo(() => {
-    const sorted = [...filtered].sort(
-      (a, b) => new Date(b.transacted_at).getTime() - new Date(a.transacted_at).getTime()
-    );
-    const map = new Map<string, Transaction[]>();
-    for (const tx of sorted) {
-      const key = sectionTitle(tx.transacted_at);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(tx);
+  // Step 2: calendar cell renderer
+  const renderCalendarCell = (item: Date | null, index: number) => {
+    if (!item) {
+      return <View key={`empty-${index}`} style={styles.calCell} />;
     }
-    return Array.from(map.entries()).map(([title, data]) => ({ title, data }));
-  }, [filtered]);
+    const dateStr = dateToKey(item);
+    const isToday = dateStr === today;
+    const isSelected = dateStr === selectedDay;
+    const dots = txDayMap[dateStr];
 
-  const FILTERS: { key: FilterType; label: string }[] = [
-    { key: "all", label: "전체" },
-    { key: "income", label: "수입" },
-    { key: "expense", label: "지출" },
-    { key: "transfer", label: "이체" },
-  ];
-
-  const ListHeader = (
-    <View style={styles.listHeader}>
-      <Text style={styles.title}>거래 내역</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterContent}
+    return (
+      <TouchableOpacity
+        key={dateStr}
+        style={styles.calCell}
+        onPress={() => handleDayPress(dateStr)}
+        activeOpacity={0.7}
       >
-        {FILTERS.map((f) => (
-          <TouchableOpacity
-            key={f.key}
-            style={[styles.filterTab, filter === f.key && styles.filterTabActive]}
-            onPress={() => setFilter(f.key)}
+        <View
+          style={[
+            styles.calDayCircle,
+            isToday && !isSelected && styles.calDayToday,
+            isSelected && styles.calDaySelected,
+          ]}
+        >
+          <Text
+            style={[
+              styles.calDayText,
+              isSelected && styles.calDayTextSelected,
+              isToday && !isSelected && styles.calDayTextToday,
+              item.getDay() === 0 && !isSelected && styles.calDayTextSun,
+              item.getDay() === 6 && !isSelected && styles.calDayTextSat,
+            ]}
           >
-            <Text style={[styles.filterTabText, filter === f.key && styles.filterTabTextActive]}>
-              {f.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
-  );
+            {item.getDate()}
+          </Text>
+        </View>
+        <View style={styles.calDotRow}>
+          {dots?.income && (
+            <View style={[styles.calDot, { backgroundColor: theme.colors.income }]} />
+          )}
+          {dots?.expense && (
+            <View style={[styles.calDot, { backgroundColor: theme.colors.expense }]} />
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
+      {/* Step 2: Calendar section (fixed top) */}
+      <View style={styles.calendarSection}>
+        {/* Month navigator */}
+        <View style={styles.monthNav}>
+          <TouchableOpacity style={styles.monthNavBtn} onPress={prevMonth} activeOpacity={0.7}>
+            <Text style={styles.monthNavArrow}>‹</Text>
+          </TouchableOpacity>
+          <Text style={styles.monthNavTitle}>
+            {year}년 {month + 1}월
+          </Text>
+          <TouchableOpacity style={styles.monthNavBtn} onPress={nextMonth} activeOpacity={0.7}>
+            <Text style={styles.monthNavArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Weekday header */}
+        <View style={styles.weekdayRow}>
+          {WEEKDAYS.map((d, i) => (
+            <Text
+              key={d}
+              style={[
+                styles.weekdayText,
+                i === 0 && styles.weekdayTextSun,
+                i === 6 && styles.weekdayTextSat,
+              ]}
+            >
+              {d}
+            </Text>
+          ))}
+        </View>
+
+        {/* Calendar grid */}
+        <View style={styles.calGrid}>
+          {calendarDays.map((d, i) => renderCalendarCell(d, i))}
+        </View>
+
+        {/* Day summary bar */}
+        <View style={styles.summaryBar}>
+          <Text style={styles.summaryDateText}>{selectedDayLabel}</Text>
+          <View style={styles.summaryAmounts}>
+            {daySummary.income > 0 && (
+              <Text style={[styles.summaryAmount, { color: theme.colors.income }]}>
+                +{formatSummaryAmount(daySummary.income)}
+              </Text>
+            )}
+            {daySummary.expense > 0 && (
+              <Text style={[styles.summaryAmount, { color: theme.colors.expense }]}>
+                -{formatSummaryAmount(daySummary.expense)}
+              </Text>
+            )}
+            {daySummary.income === 0 && daySummary.expense === 0 && (
+              <Text style={styles.summaryEmpty}>내역 없음</Text>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Step 3: Transaction list (scrollable) */}
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 80 }} color={theme.colors.primary} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator color={theme.colors.primary} />
+        </View>
       ) : (
-        <SectionList
-          sections={sections}
+        <FlatList
+          data={listTx}
           keyExtractor={(item) => item.id}
-          ListHeaderComponent={ListHeader}
+          style={styles.list}
           contentContainerStyle={styles.listContent}
-          stickySectionHeadersEnabled={false}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
-          renderSectionHeader={({ section }) => (
-            <Text style={styles.sectionLabel}>{section.title}</Text>
-          )}
-          renderSectionFooter={() => <View style={styles.sectionFooter} />}
-          renderItem={({ item, index, section }) => {
-            const isFirst = index === 0;
-            const isLast = index === section.data.length - 1;
+          renderItem={({ item }) => {
+            const typeColor = TYPE_COLORS[item.type] ?? theme.colors.transfer;
             return (
-              <View
-                style={[
-                  styles.row,
-                  isFirst && styles.rowFirst,
-                  isLast && styles.rowLast,
-                ]}
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => openEdit(item)}
+                activeOpacity={0.7}
               >
-                <View style={[styles.typeDot, { backgroundColor: TYPE_COLORS[item.type as TransactionType] }]} />
+                <View style={[styles.typeDot, { backgroundColor: typeColor }]} />
                 <View style={styles.rowInfo}>
                   <Text style={styles.rowDescription} numberOfLines={1}>
-                    {item.description ?? TYPE_LABELS[item.type as TransactionType]}
+                    {item.description ?? TYPE_LABELS[item.type] ?? item.type}
                   </Text>
                   {getCategoryName(item.category_id) && (
-                    <Text style={styles.rowCategory}>{getCategoryName(item.category_id)}</Text>
+                    <Text style={styles.rowCategory}>
+                      {getCategoryName(item.category_id)}
+                    </Text>
                   )}
                 </View>
-                <View style={styles.rowRight}>
-                  <Text style={[styles.rowAmount, { color: TYPE_COLORS[item.type as TransactionType] }]}>
-                    {formatAmount(item.type as TransactionType, item.amount)}
-                  </Text>
-                  <Text style={styles.rowDate}>{formatDate(item.transacted_at)}</Text>
-                </View>
-                <View style={styles.rowActions}>
-                  <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
-                    <Text style={styles.editBtnText}>수정</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
-                    <Text style={styles.deleteBtnText}>삭제</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+                <Text style={[styles.rowAmount, { color: typeColor }]}>
+                  {formatAmount(item.type, item.amount)}
+                </Text>
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => handleDelete(item)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.deleteBtnText}>삭제</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
             );
           }}
           ListEmptyComponent={
-            <Text style={styles.empty}>거래 내역이 없습니다. 추가해보세요!</Text>
+            <Text style={styles.empty}>
+              {selectedDay ? "이 날 거래 내역이 없습니다." : "이 달 거래 내역이 없습니다."}
+            </Text>
           }
         />
       )}
 
+      {/* Step 4: FAB — pre-fills selectedDay */}
       <TouchableOpacity style={styles.fab} onPress={openCreate} activeOpacity={0.85}>
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
+      {/* Step 4: FormModal with initialDate */}
       <FormModal
         visible={modalVisible}
         initial={editing}
+        initialDate={editing ? undefined : (selectedDay ?? today)}
         onClose={() => setModalVisible(false)}
         onSubmit={handleSubmit}
       />
@@ -411,76 +577,150 @@ export default function TransactionListScreen() {
   );
 }
 
+// ── 스타일 ────────────────────────────────────────────────
+
+const CAL_CELL_SIZE = 36;
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.surface },
-  listContent: {
-    paddingHorizontal: theme.spacing.md,
-    paddingBottom: 100,
-  },
-  listHeader: {
-    paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
-  },
-  title: { ...theme.typography.h1, color: theme.colors.text.primary, marginBottom: theme.spacing.md },
-  filterContent: {
-    gap: theme.spacing.sm,
-    paddingVertical: 2,
-  },
-  filterTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: theme.radius.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+
+  // Calendar
+  calendarSection: {
     backgroundColor: theme.colors.bg,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
-  filterTabActive: {
-    backgroundColor: theme.colors.primary,
+  monthNav: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: theme.spacing.sm,
+  },
+  monthNavBtn: { padding: 8 },
+  monthNavArrow: {
+    fontSize: 26,
+    color: theme.colors.text.secondary,
+    fontWeight: "300",
+    lineHeight: 30,
+  },
+  monthNavTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: theme.colors.text.primary,
+  },
+  weekdayRow: {
+    flexDirection: "row",
+    marginBottom: 2,
+  },
+  weekdayText: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: "600",
+    color: theme.colors.text.secondary,
+    paddingVertical: 4,
+  },
+  weekdayTextSun: { color: theme.colors.expense },
+  weekdayTextSat: { color: theme.colors.primary },
+  calGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  calCell: {
+    width: `${100 / 7}%` as any,
+    alignItems: "center",
+    paddingVertical: 3,
+  },
+  calDayCircle: {
+    width: CAL_CELL_SIZE,
+    height: CAL_CELL_SIZE,
+    borderRadius: CAL_CELL_SIZE / 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  calDayToday: {
+    borderWidth: 2,
     borderColor: theme.colors.primary,
   },
-  filterTabText: { fontSize: 14, color: theme.colors.text.secondary, fontWeight: "500" },
-  filterTabTextActive: { color: "#fff", fontWeight: "700" },
-  sectionLabel: {
-    ...theme.typography.caption,
-    fontWeight: "700",
-    color: theme.colors.text.secondary,
-    paddingTop: theme.spacing.sm,
-    paddingBottom: theme.spacing.xs,
+  calDaySelected: {
+    backgroundColor: theme.colors.primary,
   },
-  sectionFooter: { height: theme.spacing.sm },
+  calDayText: {
+    fontSize: 14,
+    color: theme.colors.text.primary,
+  },
+  calDayTextSelected: { color: "#fff", fontWeight: "700" },
+  calDayTextToday: { color: theme.colors.primary, fontWeight: "700" },
+  calDayTextSun: { color: theme.colors.expense },
+  calDayTextSat: { color: theme.colors.primary },
+  calDotRow: {
+    flexDirection: "row",
+    gap: 2,
+    height: 6,
+    marginTop: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  calDot: { width: 4, height: 4, borderRadius: 2 },
+  summaryBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  summaryDateText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.colors.text.primary,
+  },
+  summaryAmounts: { flexDirection: "row", gap: theme.spacing.sm },
+  summaryAmount: { fontSize: 13, fontWeight: "700" },
+  summaryEmpty: { fontSize: 13, color: theme.colors.text.hint },
+
+  // List
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  list: { flex: 1 },
+  listContent: {
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.sm,
+    paddingBottom: 100,
+  },
+  separator: { height: 1, backgroundColor: theme.colors.border },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: theme.spacing.md,
     paddingVertical: 14,
+    paddingHorizontal: theme.spacing.sm,
     backgroundColor: theme.colors.bg,
-  },
-  rowFirst: {
-    borderTopLeftRadius: theme.radius.lg,
-    borderTopRightRadius: theme.radius.lg,
-  },
-  rowLast: {
-    borderBottomLeftRadius: theme.radius.lg,
-    borderBottomRightRadius: theme.radius.lg,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginHorizontal: theme.spacing.md,
   },
   typeDot: { width: 10, height: 10, borderRadius: 5, marginRight: theme.spacing.sm },
   rowInfo: { flex: 1 },
-  rowDescription: { fontSize: 15, fontWeight: "600", color: theme.colors.text.primary },
-  rowCategory: { ...theme.typography.caption, color: theme.colors.text.secondary, marginTop: 2 },
-  rowRight: { alignItems: "flex-end", marginRight: theme.spacing.sm },
-  rowAmount: { fontSize: 15, fontWeight: "600" },
-  rowDate: { ...theme.typography.caption, color: theme.colors.text.hint, marginTop: 2 },
-  rowActions: { flexDirection: "row", gap: 4 },
-  editBtn: { paddingHorizontal: 8, paddingVertical: 4 },
-  editBtnText: { color: theme.colors.primary, fontSize: 13 },
+  rowDescription: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: theme.colors.text.primary,
+  },
+  rowCategory: {
+    ...theme.typography.caption,
+    color: theme.colors.text.secondary,
+    marginTop: 2,
+  },
+  rowAmount: { fontSize: 15, fontWeight: "600", marginRight: theme.spacing.sm },
   deleteBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   deleteBtnText: { color: theme.colors.expense, fontSize: 13 },
-  empty: { textAlign: "center", color: theme.colors.text.hint, marginTop: 60, fontSize: 15 },
+  empty: {
+    textAlign: "center",
+    color: theme.colors.text.hint,
+    marginTop: 40,
+    fontSize: 15,
+  },
+
+  // FAB
   fab: {
     position: "absolute",
     bottom: 28,
@@ -498,8 +738,13 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabText: { color: "#fff", fontSize: 28, fontWeight: "300", lineHeight: 32 },
-  // 모달
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
+
+  // Modal
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
   sheet: {
     backgroundColor: theme.colors.bg,
     borderTopLeftRadius: theme.radius.lg,
@@ -507,8 +752,17 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     maxHeight: "90%",
   },
-  sheetTitle: { ...theme.typography.h2, color: theme.colors.text.primary, marginBottom: 20 },
-  label: { ...theme.typography.caption, color: theme.colors.text.secondary, marginBottom: 6, marginTop: 14 },
+  sheetTitle: {
+    ...theme.typography.h2,
+    color: theme.colors.text.primary,
+    marginBottom: 20,
+  },
+  label: {
+    ...theme.typography.caption,
+    color: theme.colors.text.secondary,
+    marginBottom: 6,
+    marginTop: 14,
+  },
   input: {
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -538,7 +792,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  categoryChipSelected: { borderColor: theme.colors.primary, backgroundColor: "#EEF5FF" },
+  categoryChipSelected: {
+    borderColor: theme.colors.primary,
+    backgroundColor: "#EEF5FF",
+  },
   categoryChipDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   categoryChipText: { fontSize: 13, color: theme.colors.text.secondary },
   categoryChipSelectedText: { color: theme.colors.primary, fontWeight: "600" },
