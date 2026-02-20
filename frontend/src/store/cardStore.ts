@@ -13,6 +13,7 @@ interface CardState {
   isLoading: boolean;
   fetchCards: () => Promise<void>;
   createCard: (data: CardCreate) => Promise<UserCard>;
+  updateCard: (id: string, monthly_target: number | null) => Promise<void>;
   deleteCard: (id: string) => Promise<void>;
 }
 
@@ -34,6 +35,11 @@ export const useCardStore = create<CardState>((set) => ({
     const { data } = await apiClient.post("/cards/", payload);
     set((s) => ({ cards: [...s.cards, data] }));
     return data;
+  },
+
+  updateCard: async (id, monthly_target) => {
+    const { data } = await apiClient.patch(`/cards/${id}`, { monthly_target });
+    set((s) => ({ cards: s.cards.map((c) => c.id === id ? data : c) }));
   },
 
   deleteCard: async (id) => {

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.auth import get_current_user
 from app.core.database import get_db
-from app.schemas.user_card import UserCardCreate, UserCardResponse
+from app.schemas.user_card import UserCardCreate, UserCardResponse, UserCardUpdate
 import app.services.user_card as card_service
 
 router = APIRouter(prefix="/cards", tags=["cards"])
@@ -26,6 +26,16 @@ def create_card(
     db: Session = Depends(get_db),
 ):
     return card_service.create_card(db, current_user.id, data)
+
+
+@router.patch("/{card_id}", response_model=UserCardResponse)
+def update_card(
+    card_id: uuid.UUID,
+    data: UserCardUpdate,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return card_service.update_card(db, current_user.id, card_id, data)
 
 
 @router.delete("/{card_id}", status_code=status.HTTP_204_NO_CONTENT)

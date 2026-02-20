@@ -4,12 +4,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { BarChart, PieChart } from "react-native-gifted-charts";
 import { useTransactionStore } from "../../store/transactionStore";
 import { useCategoryStore } from "../../store/categoryStore";
+import { useCardStore } from "../../store/cardStore";
 import { theme } from "../../theme";
 import { Transaction } from "../../types";
 
@@ -62,6 +64,7 @@ function aggregateByCategory(txs: Transaction[], type: "expense" | "income", cat
 export default function AnalysisScreen() {
   const { transactions, fetchTransactions } = useTransactionStore();
   const { categories, fetchCategories } = useCategoryStore();
+  const { cards, fetchCards, updateCard } = useCardStore();
   const now = new Date();
 
   const [mode, setMode] = useState<PeriodMode>("month");
@@ -69,10 +72,13 @@ export default function AnalysisScreen() {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth()); // 0-based
   const [selectedDay, setSelectedDay] = useState(now.getDate());
   const [rankTab, setRankTab] = useState<RankTab>("expense");
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [editingTarget, setEditingTarget] = useState("");
 
   useEffect(() => {
     fetchTransactions();
     fetchCategories();
+    fetchCards();
   }, []);
 
   // --- Filtered transactions ---
@@ -109,6 +115,24 @@ export default function AnalysisScreen() {
     }
     return result;
   }, [yearTxs]);
+
+  // --- Card spending aggregation (month view) ---
+  const cardSpendings = useMemo(() => {
+    const map: Record<string, number> = {};
+    monthTxs
+      .filter((t) => t.type === "expense" && t.user_card_id)
+      .forEach((t) => {
+        map[t.user_card_id!] = (map[t.user_card_id!] ?? 0) + (Number(t.amount) || 0);
+      });
+    return map;
+  }, [monthTxs]);
+
+  const handleSaveTarget = async (cardId: string) => {
+    const raw = editingTarget.replace(/[^0-9]/g, "");
+    const target = raw === "" ? null : parseInt(raw, 10);
+    await updateCard(cardId, target === 0 ? null : target);
+    setEditingCardId(null);
+  };
 
   // --- Navigation ---
   const goYear = (delta: number) => setSelectedYear((y) => y + delta);
@@ -356,6 +380,94 @@ export default function AnalysisScreen() {
         )
       )}
 
+      {/* Card performance section (month view only) */}
+      {mode === "month" && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>카드 실적 현황</Text>
+          {cards.length === 0 ? (
+            <Text style={styles.emptyText}>설정 {">"} 카드 관리에서 카드를 등록하세요.</Text>
+          ) : (
+            cards.map((card) => {
+              const spent = cardSpendings[card.id] ?? 0;
+              const target = card.monthly_target;
+              const isEditing = editingCardId === card.id;
+              const achieved = target !== null && spent >= target;
+              const pct = target ? Math.min(spent / target, 1) : 0;
+              const remaining = target ? Math.max(target - spent, 0) : 0;
+
+              return (
+                <View key={card.id} style={styles.cardPerformanceItem}>
+                  <View style={styles.cardPerfHeader}>
+                    <Text style={styles.cardPerfName}>{card.name}</Text>
+                    {achieved && (
+                      <View style={styles.achievedBadge}>
+                        <Text style={styles.achievedBadgeText}>달성!</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={styles.cardPerfEditBtn}
+                      onPress={() => {
+                        setEditingCardId(card.id);
+                        setEditingTarget(target !== null ? String(target) : "");
+                      }}
+                    >
+                      <Text style={styles.cardPerfEditBtnText}>
+                        {target !== null ? "수정" : "설정"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {isEditing ? (
+                    <View style={styles.cardPerfEditRow}>
+                      <TextInput
+                        style={styles.cardPerfInput}
+                        value={editingTarget}
+                        onChangeText={setEditingTarget}
+                        keyboardType="numeric"
+                        placeholder="목표 금액 (원)"
+                        autoFocus
+                      />
+                      <TouchableOpacity
+                        style={styles.cardPerfSaveBtn}
+                        onPress={() => handleSaveTarget(card.id)}
+                      >
+                        <Text style={styles.cardPerfSaveBtnText}>확인</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : target === null ? (
+                    <Text style={styles.cardPerfNoTarget}>목표 미설정</Text>
+                  ) : (
+                    <>
+                      <Text style={styles.cardPerfTargetLabel}>목표 {fmt(target)}</Text>
+                      <View style={styles.cardPerfProgressRow}>
+                        <View style={styles.progressBg}>
+                          <View
+                            style={[
+                              styles.progressFill,
+                              {
+                                width: `${Math.round(pct * 100)}%` as any,
+                                backgroundColor: achieved ? theme.colors.income : theme.colors.primary,
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.cardPerfSpent}>{fmt(spent)}</Text>
+                      </View>
+                      <View style={styles.cardPerfFooter}>
+                        <Text style={styles.cardPerfRemaining}>
+                          {achieved ? "목표 달성" : `잔여 ${fmt(remaining)}`}
+                        </Text>
+                        <Text style={styles.cardPerfPct}>{Math.round(pct * 100)}%</Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+              );
+            })
+          )}
+        </View>
+      )}
+
       {/* Ranking (year / month views) */}
       {mode !== "day" && (
         <View style={styles.card}>
@@ -520,4 +632,67 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingVertical: theme.spacing.md,
   },
+
+  cardPerformanceItem: {
+    paddingVertical: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    marginBottom: theme.spacing.xs,
+  },
+  cardPerfHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: theme.spacing.xs,
+  },
+  cardPerfName: { flex: 1, fontSize: 15, fontWeight: "600", color: theme.colors.text.primary },
+  achievedBadge: {
+    backgroundColor: theme.colors.income,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: theme.spacing.xs + 2,
+    paddingVertical: 2,
+    marginRight: theme.spacing.xs,
+  },
+  achievedBadgeText: { fontSize: 11, fontWeight: "700", color: "#FFFFFF" },
+  cardPerfEditBtn: {
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.sm,
+  },
+  cardPerfEditBtnText: { fontSize: 12, color: theme.colors.primary, fontWeight: "600" },
+  cardPerfNoTarget: { fontSize: 13, color: theme.colors.text.hint },
+  cardPerfTargetLabel: { fontSize: 13, color: theme.colors.text.secondary, marginBottom: theme.spacing.xs },
+  cardPerfProgressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
+  },
+  cardPerfSpent: { fontSize: 13, fontWeight: "600", color: theme.colors.text.primary, minWidth: 80, textAlign: "right" },
+  cardPerfFooter: { flexDirection: "row", justifyContent: "space-between" },
+  cardPerfRemaining: { fontSize: 12, color: theme.colors.text.secondary },
+  cardPerfPct: { fontSize: 12, fontWeight: "700", color: theme.colors.text.primary },
+  cardPerfEditRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
+  },
+  cardPerfInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    fontSize: 14,
+    color: theme.colors.text.primary,
+  },
+  cardPerfSaveBtn: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs + 2,
+  },
+  cardPerfSaveBtnText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
 });

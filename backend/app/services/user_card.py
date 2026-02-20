@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.user_card import UserCard
-from app.schemas.user_card import UserCardCreate
+from app.schemas.user_card import UserCardCreate, UserCardUpdate
 
 
 def list_cards(db: Session, user_id: uuid.UUID) -> list[UserCard]:
@@ -21,6 +21,18 @@ def list_cards(db: Session, user_id: uuid.UUID) -> list[UserCard]:
 def create_card(db: Session, user_id: uuid.UUID, data: UserCardCreate) -> UserCard:
     card = UserCard(user_id=user_id, type=data.type, name=data.name)
     db.add(card)
+    db.commit()
+    db.refresh(card)
+    return card
+
+
+def update_card(db: Session, user_id: uuid.UUID, card_id: uuid.UUID, data: UserCardUpdate) -> UserCard:
+    card = db.scalar(
+        select(UserCard).where(UserCard.id == card_id, UserCard.user_id == user_id)
+    )
+    if card is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    card.monthly_target = data.monthly_target
     db.commit()
     db.refresh(card)
     return card
