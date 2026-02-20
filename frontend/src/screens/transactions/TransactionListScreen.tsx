@@ -61,7 +61,7 @@ function buildCalendarDays(year: number, month: number): (Date | null)[] {
 }
 
 function formatAmount(type: string, amount: number): string {
-  const formatted = amount.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
+  const formatted = Math.round(amount).toLocaleString("ko-KR");
   if (type === "income") return `+${formatted}원`;
   if (type === "expense") return `-${formatted}원`;
   return `${formatted}원`;
@@ -496,10 +496,10 @@ export default function TransactionListScreen() {
           <Text style={styles.summaryDateText}>{selectedDayLabel}</Text>
           <View style={styles.summaryAmounts}>
             <Text style={[styles.summaryAmount, { color: theme.colors.income }]}>
-              수입 {daySummary.income.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}원
+              수입 {Math.round(daySummary.income).toLocaleString("ko-KR")}원
             </Text>
             <Text style={[styles.summaryAmount, { color: theme.colors.expense }]}>
-              지출 {daySummary.expense.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}원
+              지출 {Math.round(daySummary.expense).toLocaleString("ko-KR")}원
             </Text>
           </View>
         </View>
