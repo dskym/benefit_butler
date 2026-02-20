@@ -24,11 +24,12 @@ const CHART_COLORS = [
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function fmt(amount: number) {
-  return amount.toLocaleString("ko-KR") + "원";
+  const safe = isNaN(amount) ? 0 : Math.round(amount);
+  return safe.toLocaleString("ko-KR", { maximumFractionDigits: 0 }) + "원";
 }
 
 function sumByType(txs: Transaction[], type: string) {
-  return txs.filter((t) => t.type === type).reduce((s, t) => s + t.amount, 0);
+  return txs.filter((t) => t.type === type).reduce((s, t) => s + (Number(t.amount) || 0), 0);
 }
 
 function aggregateByCategory(txs: Transaction[], type: "expense" | "income", categories: any[]) {
@@ -44,7 +45,7 @@ function aggregateByCategory(txs: Transaction[], type: "expense" | "income", cat
         color: cat?.color ?? CHART_COLORS[idx % CHART_COLORS.length],
       };
     }
-    map[key].total += t.amount;
+    map[key].total += Number(t.amount) || 0;
   });
   return Object.values(map).sort((a, b) => b.total - a.total);
 }
@@ -172,8 +173,6 @@ export default function AnalysisScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       {/* 헤더 */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>분석</Text>
-
         {/* Period mode toggle */}
         <View style={styles.toggleRow}>
           {(["year", "month", "day"] as PeriodMode[]).map((m) => (
@@ -272,7 +271,7 @@ export default function AnalysisScreen() {
               rulesColor={theme.colors.border}
               rulesType="solid"
               width={360}
-              maxValue={Math.max(...monthlyBarData.map((d) => d.value), 1) * 1.2}
+              maxValue={Math.max(...monthlyBarData.map((d) => isNaN(d.value) ? 0 : d.value), 1) * 1.2}
             />
           </ScrollView>
         </View>
@@ -322,7 +321,7 @@ export default function AnalysisScreen() {
                 centerLabelComponent={() => (
                   <View style={styles.pieCenter}>
                     <Text style={styles.pieCenterLabel}>지출</Text>
-                    <Text style={styles.pieCenterAmount}>{expenseTotal.toLocaleString("ko-KR")}</Text>
+                    <Text style={styles.pieCenterAmount}>{Math.round(expenseTotal).toLocaleString("ko-KR", { maximumFractionDigits: 0 })}</Text>
                   </View>
                 )}
               />

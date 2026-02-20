@@ -75,7 +75,7 @@ function MainNavigator() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap;
-          if (route.name === "거래") {
+          if (route.name === "가계부") {
             iconName = focused ? "list" : "list-outline";
           } else if (route.name === "분석") {
             iconName = focused ? "bar-chart" : "bar-chart-outline";
@@ -86,7 +86,7 @@ function MainNavigator() {
         },
       })}
     >
-      <MainTab.Screen name="거래" component={TransactionListScreen} />
+      <MainTab.Screen name="가계부" component={TransactionListScreen} />
       <MainTab.Screen name="분석" component={AnalysisScreen} />
       <MainTab.Screen name="설정" component={SettingsNavigator} />
     </MainTab.Navigator>
