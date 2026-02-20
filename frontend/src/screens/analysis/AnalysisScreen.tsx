@@ -28,6 +28,15 @@ function fmt(amount: number) {
   return safe.toLocaleString("ko-KR", { maximumFractionDigits: 0 }) + "원";
 }
 
+function fmtShort(amount: number): string {
+  const safe = isNaN(amount) ? 0 : Math.round(amount);
+  if (safe === 0) return "";
+  if (safe >= 100000000) return `${Math.round(safe / 100000000)}억`;
+  if (safe >= 10000) return `${Math.round(safe / 10000)}만`;
+  if (safe >= 1000) return `${Math.round(safe / 1000)}천`;
+  return String(safe);
+}
+
 function sumByType(txs: Transaction[], type: string) {
   return txs.filter((t) => t.type === type).reduce((s, t) => s + (Number(t.amount) || 0), 0);
 }
@@ -95,8 +104,8 @@ export default function AnalysisScreen() {
       const txs = yearTxs.filter((t) => new Date(t.transacted_at).getMonth() === m);
       const inc = sumByType(txs, "income");
       const exp = sumByType(txs, "expense");
-      result.push({ value: inc, label: MONTH_LABELS[m], frontColor: theme.colors.income, spacing: 4 });
-      result.push({ value: exp, frontColor: theme.colors.expense, spacing: m < 11 ? 12 : 0 });
+      result.push({ value: inc, label: MONTH_LABELS[m], frontColor: theme.colors.income, spacing: 4, topLabelComponent: () => inc > 0 ? <Text style={{ fontSize: 8, color: theme.colors.income }}>{fmtShort(inc)}</Text> : null });
+      result.push({ value: exp, frontColor: theme.colors.expense, spacing: m < 11 ? 12 : 0, topLabelComponent: () => exp > 0 ? <Text style={{ fontSize: 8, color: theme.colors.expense }}>{fmtShort(exp)}</Text> : null });
     }
     return result;
   }, [yearTxs]);
@@ -331,7 +340,7 @@ export default function AnalysisScreen() {
                 <View key={i} style={styles.pieLegendItem}>
                   <View style={[styles.legendDot, { backgroundColor: d.color }]} />
                   <Text style={styles.pieLegendLabel} numberOfLines={1}>{d.label}</Text>
-                  <Text style={styles.pieLegendAmount}>{d.value.toLocaleString("ko-KR")}원</Text>
+                  <Text style={styles.pieLegendAmount}>{fmt(d.value)}</Text>
                   <Text style={styles.pieLegendPct}>
                     {expenseTotal > 0 ? Math.round((d.value / expenseTotal) * 100) : 0}%
                   </Text>
