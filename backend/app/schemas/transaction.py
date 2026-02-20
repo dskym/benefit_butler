@@ -26,6 +26,10 @@ class TransactionUpdate(BaseModel):
     user_card_id: uuid.UUID | None = None
 
 
+class FavoritePatch(BaseModel):
+    is_favorite: bool
+
+
 class TransactionResponse(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
@@ -38,5 +42,6 @@ class TransactionResponse(BaseModel):
     updated_at: datetime
     payment_type: str | None
     user_card_id: uuid.UUID | None
+    is_favorite: bool
 
     model_config = {"from_attributes": True}
