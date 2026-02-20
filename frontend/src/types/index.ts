@@ -23,6 +23,7 @@ export interface UserCard {
   user_id: string;
   type: "credit_card" | "debit_card";
   name: string;
+  monthly_target: number | null;
   created_at: string;
 }
 
