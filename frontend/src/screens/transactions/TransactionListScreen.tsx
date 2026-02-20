@@ -1220,45 +1220,57 @@ const styles = StyleSheet.create({
   },
   submitBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
 
-  // Favorites row
-  favRow: {
+  // Favorites section
+  favSection: {
+    backgroundColor: theme.colors.bg,
+    marginBottom: theme.spacing.sm,
+  },
+  favSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  favSectionTitle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  favSectionTitleText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: theme.colors.text.primary,
+  },
+  favBadge: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  favBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  favToggleText: {
+    fontSize: 16,
+    color: theme.colors.text.secondary,
+  },
+  favItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: theme.spacing.md,
     backgroundColor: theme.colors.bg,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
-  favRowContent: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    gap: 8,
-  },
-  favChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    gap: 6,
-    maxWidth: 200,
-  },
-  favChipDot: {
-    width: 8,
+  favSectionDivider: {
     height: 8,
-    borderRadius: 4,
-    flexShrink: 0,
-  },
-  favChipLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: theme.colors.text.primary,
-    flexShrink: 1,
-  },
-  favChipAmount: {
-    fontSize: 12,
-    color: theme.colors.text.secondary,
-    flexShrink: 0,
+    backgroundColor: theme.colors.surface,
   },
 
   // Context menu
