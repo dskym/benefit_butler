@@ -166,7 +166,7 @@ function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }
       setShowAddCard(false);
       fetchCards();
     }
-  }, [visible, initial, prefill, initialDate]);
+  }, [visible, initial, prefill, initialDate, fetchCards]);
 
   const handleTypeChange = (newType: "income" | "expense") => {
     setType(newType);
@@ -483,6 +483,7 @@ export default function TransactionListScreen() {
     createTransaction,
     updateTransaction,
     deleteTransaction,
+    toggleFavorite,
   } = useTransactionStore();
   const { categories, fetchCategories } = useCategoryStore();
   const { cards, fetchCards } = useCardStore();
@@ -491,10 +492,8 @@ export default function TransactionListScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
 
-  // Favorites
-  const { toggleFavorite } = useTransactionStore();
   const favorites = useMemo(
-    () => transactions.filter((t) => t.is_favorite).slice(0, 10),
+    () => transactions.filter((t) => t.is_favorite && t.type !== "transfer").slice(0, 10),
     [transactions]
   );
   const [contextTx, setContextTx] = useState<Transaction | null>(null);
@@ -580,6 +579,7 @@ export default function TransactionListScreen() {
 
   const openEdit = (item: Transaction) => {
     setEditing(item);
+    setFavoritePrefill(null);
     setModalVisible(true);
   };
 
