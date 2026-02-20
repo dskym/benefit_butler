@@ -61,6 +61,14 @@ export default function SettingsScreen() {
             <Text style={styles.rowLabel}>카테고리 관리</Text>
             <Text style={styles.rowChevron}>›</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.row, styles.rowLast]}
+            onPress={() => navigation.navigate("CardList")}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.rowLabel}>카드 관리</Text>
+            <Text style={styles.rowChevron}>›</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
