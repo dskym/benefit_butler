@@ -246,9 +246,17 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.sheetTitle}>{initial ? "내역 수정" : "내역 추가"}</Text>
+            <Text style={styles.label}>날짜 및 시간 (YYYY-MM-DD HH:MM)</Text>
+            <TextInput
+              style={styles.input}
+              value={datetime}
+              onChangeText={setDatetime}
+              placeholder="2024-01-01 14:30"
+              placeholderTextColor={theme.colors.text.hint}
+              autoCapitalize="none"
+              keyboardType="numbers-and-punctuation"
+            />
 
-            {/* Step 1: type selector — income/expense only */}
             <Text style={styles.label}>종류</Text>
             <View style={styles.typeRow}>
               {FORM_TYPES.map((t) => (
@@ -265,76 +273,6 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
-
-            <Text style={styles.label}>금액 (원)</Text>
-            <TextInput
-              style={styles.input}
-              value={amount}
-              onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ""))}
-              placeholder="예: 15000"
-              placeholderTextColor={theme.colors.text.hint}
-              keyboardType="numeric"
-            />
-
-            <Text style={styles.label}>날짜 및 시간 (YYYY-MM-DD HH:MM)</Text>
-            <TextInput
-              style={styles.input}
-              value={datetime}
-              onChangeText={setDatetime}
-              placeholder="2024-01-01 14:30"
-              placeholderTextColor={theme.colors.text.hint}
-              autoCapitalize="none"
-              keyboardType="numbers-and-punctuation"
-            />
-
-            <Text style={styles.label}>메모 (선택)</Text>
-            <TextInput
-              style={styles.input}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="예: 점심 식사"
-              placeholderTextColor={theme.colors.text.hint}
-            />
-
-            <Text style={styles.label}>카테고리 (선택)</Text>
-            <View style={styles.categoryList}>
-              <TouchableOpacity
-                style={[styles.categoryChip, !categoryId && styles.categoryChipSelected]}
-                onPress={() => setCategoryId("")}
-              >
-                <Text style={[styles.categoryChipText, !categoryId && styles.categoryChipSelectedText]}>
-                  없음
-                </Text>
-              </TouchableOpacity>
-              {filteredCategories.map((c) => (
-                <TouchableOpacity
-                  key={c.id}
-                  style={[
-                    styles.categoryChip,
-                    categoryId === c.id && styles.categoryChipSelected,
-                    categoryId === c.id && { borderColor: c.color ?? theme.colors.primary },
-                  ]}
-                  onPress={() => setCategoryId(c.id)}
-                >
-                  {c.color && (
-                    <View style={[styles.categoryChipDot, { backgroundColor: c.color }]} />
-                  )}
-                  <Text
-                    style={[
-                      styles.categoryChipText,
-                      categoryId === c.id && styles.categoryChipSelectedText,
-                    ]}
-                  >
-                    {c.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              {filteredCategories.length === 0 && (
-                <Text style={styles.noCategoryText}>
-                  {type === "income" ? "수입" : "지출"} 카테고리가 없습니다.
-                </Text>
-              )}
             </View>
 
             {/* 결제 수단 — 지출일 때만 표시 */}
@@ -407,6 +345,65 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
                 )}
               </>
             )}
+
+            <Text style={styles.label}>카테고리 (선택)</Text>
+            <View style={styles.categoryList}>
+              <TouchableOpacity
+                style={[styles.categoryChip, !categoryId && styles.categoryChipSelected]}
+                onPress={() => setCategoryId("")}
+              >
+                <Text style={[styles.categoryChipText, !categoryId && styles.categoryChipSelectedText]}>
+                  없음
+                </Text>
+              </TouchableOpacity>
+              {filteredCategories.map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  style={[
+                    styles.categoryChip,
+                    categoryId === c.id && styles.categoryChipSelected,
+                    categoryId === c.id && { borderColor: c.color ?? theme.colors.primary },
+                  ]}
+                  onPress={() => setCategoryId(c.id)}
+                >
+                  {c.color && (
+                    <View style={[styles.categoryChipDot, { backgroundColor: c.color }]} />
+                  )}
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      categoryId === c.id && styles.categoryChipSelectedText,
+                    ]}
+                  >
+                    {c.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {filteredCategories.length === 0 && (
+                <Text style={styles.noCategoryText}>
+                  {type === "income" ? "수입" : "지출"} 카테고리가 없습니다.
+                </Text>
+              )}
+            </View>
+
+            <Text style={styles.label}>금액 (원)</Text>
+            <TextInput
+              style={styles.input}
+              value={amount}
+              onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ""))}
+              placeholder="예: 15000"
+              placeholderTextColor={theme.colors.text.hint}
+              keyboardType="numeric"
+            />
+
+            <Text style={styles.label}>메모 (선택)</Text>
+            <TextInput
+              style={styles.input}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="예: 점심 식사"
+              placeholderTextColor={theme.colors.text.hint}
+            />
 
             <View style={styles.sheetActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
@@ -950,7 +947,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: theme.radius.lg,
     borderTopRightRadius: theme.radius.lg,
     padding: theme.spacing.lg,
-    maxHeight: "90%",
+    height: "90%",
   },
   sheetTitle: {
     ...theme.typography.h2,
