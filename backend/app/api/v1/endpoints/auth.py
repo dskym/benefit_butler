@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.core.security import decode_token
 from app.schemas.user import UserCreate, UserLogin, UserResponse, TokenResponse
 import app.services.auth as auth_service
+from app.services.category import seed_default_categories
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()
@@ -32,7 +33,9 @@ def get_current_user(
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(data: UserCreate, db: Session = Depends(get_db)):
-    return auth_service.register_user(db, data)
+    user = auth_service.register_user(db, data)
+    seed_default_categories(db, user.id)
+    return user
 
 
 @router.post("/login", response_model=TokenResponse)

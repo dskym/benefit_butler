@@ -2,7 +2,7 @@
 import uuid
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.category import Category
@@ -14,12 +14,24 @@ def list_categories(db: Session, user_id: uuid.UUID) -> list[Category]:
         db.scalars(
             select(Category)
             .where(Category.user_id == user_id)
-            .order_by(Category.created_at.desc())
+            .order_by(Category.is_default.desc(), Category.created_at.asc())
         ).all()
     )
 
 
 def create_category(db: Session, user_id: uuid.UUID, data: CategoryCreate) -> Category:
+    count = db.scalar(
+        select(func.count()).where(
+            Category.user_id == user_id,
+            Category.type == data.type,
+        )
+    )
+    if count >= 30:
+        label = "수입" if data.type == "income" else "지출"
+        raise HTTPException(
+            status_code=400,
+            detail=f"{label} 카테고리는 최대 30개까지 만들 수 있습니다.",
+        )
     category = Category(
         user_id=user_id,
         name=data.name,
@@ -45,6 +57,8 @@ def update_category(
     db: Session, user_id: uuid.UUID, category_id: uuid.UUID, data: CategoryUpdate
 ) -> Category:
     category = get_category(db, user_id, category_id)
+    if category.is_default:
+        raise HTTPException(status_code=403, detail="기본 카테고리는 수정할 수 없습니다.")
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(category, field, value)
     db.commit()
@@ -54,5 +68,36 @@ def update_category(
 
 def delete_category(db: Session, user_id: uuid.UUID, category_id: uuid.UUID) -> None:
     category = get_category(db, user_id, category_id)
+    if category.is_default:
+        raise HTTPException(status_code=403, detail="기본 카테고리는 삭제할 수 없습니다.")
     db.delete(category)
+    db.commit()
+
+
+DEFAULT_CATEGORIES: list[dict] = [
+    # income
+    {"name": "급여",     "type": "income",  "color": "#22C55E"},
+    {"name": "이자·배당","type": "income",  "color": "#0D9488"},
+    {"name": "용돈",     "type": "income",  "color": "#6366F1"},
+    {"name": "부업",     "type": "income",  "color": "#8B5CF6"},
+    {"name": "상여금",   "type": "income",  "color": "#F59E0B"},
+    {"name": "투자수익", "type": "income",  "color": "#84CC16"},
+    {"name": "기타수입", "type": "income",  "color": "#8B95A1"},
+    # expense
+    {"name": "식비",     "type": "expense", "color": "#F04452"},
+    {"name": "교통",     "type": "expense", "color": "#EF4444"},
+    {"name": "주거·통신","type": "expense", "color": "#F97316"},
+    {"name": "쇼핑",     "type": "expense", "color": "#F59E0B"},
+    {"name": "의료·건강","type": "expense", "color": "#EAB308"},
+    {"name": "문화·여가","type": "expense", "color": "#06B6D4"},
+    {"name": "교육",     "type": "expense", "color": "#8B5CF6"},
+    {"name": "금융",     "type": "expense", "color": "#EC4899"},
+    {"name": "경조사",   "type": "expense", "color": "#84CC16"},
+    {"name": "기타지출", "type": "expense", "color": "#8B95A1"},
+]
+
+
+def seed_default_categories(db: Session, user_id: uuid.UUID) -> None:
+    for item in DEFAULT_CATEGORIES:
+        db.add(Category(user_id=user_id, is_default=True, **item))
     db.commit()

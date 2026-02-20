@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useCategoryStore } from "../../store/categoryStore";
 import { Category } from "../../types";
+import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../../theme";
 
 type CategoryType = "income" | "expense" | "transfer";
@@ -33,6 +34,12 @@ const TYPE_COLORS: Record<CategoryType, string> = {
 
 // 타입별 섹션 순서
 const TYPE_ORDER: CategoryType[] = ["income", "expense", "transfer"];
+
+const COLOR_PALETTE: string[] = [
+  "#F04452", "#F97316", "#F59E0B", "#EAB308", "#84CC16", "#22C55E", "#0D9488",
+  "#06B6D4", "#3182F6", "#6366F1", "#8B5CF6", "#A855F7", "#EC4899", "#F43F5E",
+  "#94A3B8", "#8B95A1", "#64748B", "#374151", "#78716C", "#57534E", "#1E293B",
+];
 
 // ── 폼 모달 ──────────────────────────────────────────────
 interface FormModalProps {
@@ -91,7 +98,7 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
 
             <Text style={styles.label}>종류</Text>
             <View style={styles.typeRow}>
-              {(["income", "expense", "transfer"] as CategoryType[]).map((t) => (
+              {(["income", "expense"] as CategoryType[]).map((t) => (
                 <TouchableOpacity
                   key={t}
                   style={[
@@ -107,17 +114,18 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
               ))}
             </View>
 
-            <Text style={styles.label}>색상 (hex)</Text>
-            <View style={styles.colorRow}>
-              <View style={[styles.colorPreview, { backgroundColor: color }]} />
-              <TextInput
-                style={[styles.input, styles.colorInput]}
-                value={color}
-                onChangeText={setColor}
-                placeholder="#6366f1"
-                autoCapitalize="none"
-                placeholderTextColor={theme.colors.text.hint}
-              />
+            <Text style={styles.label}>색상</Text>
+            <View style={styles.paletteGrid}>
+              {COLOR_PALETTE.map((c) => (
+                <TouchableOpacity
+                  key={c}
+                  style={[styles.swatch, { backgroundColor: c }, color === c && styles.swatchSelected]}
+                  onPress={() => setColor(c)}
+                  activeOpacity={0.8}
+                >
+                  {color === c && <Ionicons name="checkmark" size={14} color="#fff" />}
+                </TouchableOpacity>
+              ))}
             </View>
 
             <View style={styles.sheetActions}>
@@ -196,6 +204,12 @@ export default function CategoryListScreen() {
       .filter((s) => s.data.length > 0);
   }, [categories]);
 
+  const canAddMore = useMemo(() => {
+    const incomeCount = categories.filter((c) => c.type === "income").length;
+    const expenseCount = categories.filter((c) => c.type === "expense").length;
+    return incomeCount < 30 || expenseCount < 30;
+  }, [categories]);
+
   return (
     <View style={styles.container}>
       {isLoading ? (
@@ -209,8 +223,16 @@ export default function CategoryListScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           renderSectionHeader={({ section }) => (
             <View style={styles.sectionHeaderRow}>
-              <View style={[styles.sectionDot, { backgroundColor: TYPE_COLORS[section.type] }]} />
-              <Text style={styles.sectionLabel}>{section.title}</Text>
+              <View style={styles.sectionHeaderLeft}>
+                <View style={[styles.sectionDot, { backgroundColor: TYPE_COLORS[section.type] }]} />
+                <Text style={styles.sectionLabel}>{section.title}</Text>
+              </View>
+              <Text style={[
+                styles.sectionCount,
+                section.data.length >= 30 && { color: theme.colors.expense },
+              ]}>
+                {section.data.length}/30
+              </Text>
             </View>
           )}
           renderSectionFooter={() => <View style={styles.sectionFooter} />}
@@ -221,14 +243,20 @@ export default function CategoryListScreen() {
               <View style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast]}>
                 <View style={[styles.colorDot, { backgroundColor: item.color ?? theme.colors.text.hint }]} />
                 <Text style={styles.rowName}>{item.name}</Text>
-                <View style={styles.rowActions}>
-                  <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
-                    <Text style={styles.editBtnText}>수정</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
-                    <Text style={styles.deleteBtnText}>삭제</Text>
-                  </TouchableOpacity>
-                </View>
+                {item.is_default ? (
+                  <View style={styles.defaultBadge}>
+                    <Text style={styles.defaultBadgeText}>기본</Text>
+                  </View>
+                ) : (
+                  <View style={styles.rowActions}>
+                    <TouchableOpacity style={styles.iconBtn} onPress={() => openEdit(item)}>
+                      <Ionicons name="pencil-outline" size={18} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.iconBtn} onPress={() => handleDelete(item)}>
+                      <Ionicons name="trash-outline" size={18} color={theme.colors.expense} />
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             );
           }}
@@ -239,9 +267,11 @@ export default function CategoryListScreen() {
       )}
 
       {/* 플로팅 추가 버튼 */}
-      <TouchableOpacity style={styles.fab} onPress={openCreate} activeOpacity={0.85}>
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+      {canAddMore && (
+        <TouchableOpacity style={styles.fab} onPress={openCreate} activeOpacity={0.85}>
+          <Text style={styles.fabText}>+</Text>
+        </TouchableOpacity>
+      )}
 
       <FormModal
         visible={modalVisible}
@@ -263,8 +293,18 @@ const styles = StyleSheet.create({
   sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.xs,
+  },
+  sectionHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  sectionCount: {
+    ...theme.typography.caption,
+    color: theme.colors.text.hint,
+    fontWeight: "600",
   },
   sectionDot: { width: 8, height: 8, borderRadius: 4, marginRight: theme.spacing.sm },
   sectionLabel: { ...theme.typography.caption, fontWeight: "700", color: theme.colors.text.secondary },
@@ -281,11 +321,21 @@ const styles = StyleSheet.create({
   separator: { height: 1, backgroundColor: theme.colors.border, marginHorizontal: theme.spacing.md },
   colorDot: { width: 14, height: 14, borderRadius: 7, marginRight: theme.spacing.md },
   rowName: { flex: 1, fontSize: 16, color: theme.colors.text.primary },
-  rowActions: { flexDirection: "row", gap: 4 },
-  editBtn: { paddingHorizontal: 8, paddingVertical: 4 },
-  editBtnText: { color: theme.colors.primary, fontSize: 13 },
-  deleteBtn: { paddingHorizontal: 8, paddingVertical: 4 },
-  deleteBtnText: { color: theme.colors.expense, fontSize: 13 },
+  rowActions: { flexDirection: "row", alignItems: "center", gap: 2 },
+  iconBtn: { padding: 6 },
+  defaultBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  defaultBadgeText: {
+    fontSize: 11,
+    color: theme.colors.text.hint,
+    fontWeight: "500" as const,
+  },
   empty: { textAlign: "center", color: theme.colors.text.hint, marginTop: 60, fontSize: 15 },
   fab: {
     position: "absolute",
@@ -334,9 +384,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   typeBtnText: { fontSize: 14, color: theme.colors.text.secondary },
-  colorRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.sm },
-  colorPreview: { width: 36, height: 36, borderRadius: theme.radius.sm },
-  colorInput: { flex: 1 },
+  paletteGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 4,
+  },
+  swatch: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  swatchSelected: {
+    borderWidth: 3,
+    borderColor: "rgba(0,0,0,0.25)",
+  },
   sheetActions: { flexDirection: "row", gap: 10, marginTop: 24, marginBottom: 8 },
   cancelBtn: {
     flex: 1,
