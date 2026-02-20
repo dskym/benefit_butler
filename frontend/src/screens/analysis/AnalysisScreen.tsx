@@ -393,34 +393,40 @@ export default function AnalysisScreen() {
               const isEditing = editingCardId === card.id;
               const achieved = target !== null && spent >= target;
               const pct = target ? Math.min(spent / target, 1) : 0;
-              const remaining = target ? Math.max(target - spent, 0) : 0;
 
               return (
-                <View key={card.id} style={styles.cardPerformanceItem}>
-                  <View style={styles.cardPerfHeader}>
-                    <Text style={styles.cardPerfName}>{card.name}</Text>
+                <View key={card.id} style={styles.perfCard}>
+                  {/* Header: icon + name + badge + edit btn */}
+                  <View style={styles.perfCardHeader}>
+                    <Text style={styles.perfCardIcon}>💳</Text>
+                    <Text style={styles.perfCardName}>{card.name}</Text>
                     {achieved && (
-                      <View style={styles.achievedBadge}>
-                        <Text style={styles.achievedBadgeText}>달성!</Text>
+                      <View style={styles.perfAchievedBadge}>
+                        <Text style={styles.perfAchievedBadgeText}>달성!</Text>
                       </View>
                     )}
-                    <TouchableOpacity
-                      style={styles.cardPerfEditBtn}
-                      onPress={() => {
-                        setEditingCardId(card.id);
-                        setEditingTarget(target !== null ? String(target) : "");
-                      }}
-                    >
-                      <Text style={styles.cardPerfEditBtnText}>
-                        {target !== null ? "수정" : "설정"}
-                      </Text>
-                    </TouchableOpacity>
+                    {!isEditing && (
+                      <TouchableOpacity
+                        style={styles.perfEditBtn}
+                        onPress={() => {
+                          setEditingCardId(card.id);
+                          setEditingTarget(target !== null ? String(target) : "");
+                        }}
+                      >
+                        <Text style={styles.perfEditBtnText}>
+                          {target !== null ? "수정" : "설정"}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
 
+                  <View style={styles.perfSeparator} />
+
+                  {/* Body */}
                   {isEditing ? (
-                    <View style={styles.cardPerfEditRow}>
+                    <View style={styles.perfEditRow}>
                       <TextInput
-                        style={styles.cardPerfInput}
+                        style={styles.perfInput}
                         value={editingTarget}
                         onChangeText={setEditingTarget}
                         keyboardType="numeric"
@@ -428,19 +434,23 @@ export default function AnalysisScreen() {
                         autoFocus
                       />
                       <TouchableOpacity
-                        style={styles.cardPerfSaveBtn}
+                        style={styles.perfSaveBtn}
                         onPress={() => handleSaveTarget(card.id)}
                       >
-                        <Text style={styles.cardPerfSaveBtnText}>확인</Text>
+                        <Text style={styles.perfSaveBtnText}>확인</Text>
                       </TouchableOpacity>
                     </View>
                   ) : target === null ? (
-                    <Text style={styles.cardPerfNoTarget}>목표 미설정</Text>
+                    <Text style={styles.perfNoTarget}>목표 미설정</Text>
                   ) : (
                     <>
-                      <Text style={styles.cardPerfTargetLabel}>목표 {fmt(target)}</Text>
-                      <View style={styles.cardPerfProgressRow}>
-                        <View style={styles.progressBg}>
+                      <View style={styles.perfAmountRow}>
+                        <Text style={styles.perfSpentAmt}>{fmt(spent)}</Text>
+                        <Text style={styles.perfAmountSep}> / </Text>
+                        <Text style={styles.perfTargetAmt}>{fmt(target)}</Text>
+                      </View>
+                      <View style={styles.perfProgressRow}>
+                        <View style={[styles.progressBg, { flex: 1 }]}>
                           <View
                             style={[
                               styles.progressFill,
@@ -451,13 +461,7 @@ export default function AnalysisScreen() {
                             ]}
                           />
                         </View>
-                        <Text style={styles.cardPerfSpent}>{fmt(spent)}</Text>
-                      </View>
-                      <View style={styles.cardPerfFooter}>
-                        <Text style={styles.cardPerfRemaining}>
-                          {achieved ? "목표 달성" : `잔여 ${fmt(remaining)}`}
-                        </Text>
-                        <Text style={styles.cardPerfPct}>{Math.round(pct * 100)}%</Text>
+                        <Text style={styles.perfPct}>{Math.round(pct * 100)}%</Text>
                       </View>
                     </>
                   )}
@@ -633,52 +637,63 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
   },
 
-  cardPerformanceItem: {
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    marginBottom: theme.spacing.xs,
-  },
-  cardPerfHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: theme.spacing.xs,
-  },
-  cardPerfName: { flex: 1, fontSize: 15, fontWeight: "600", color: theme.colors.text.primary },
-  achievedBadge: {
-    backgroundColor: theme.colors.income,
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: theme.spacing.xs + 2,
-    paddingVertical: 2,
-    marginRight: theme.spacing.xs,
-  },
-  achievedBadgeText: { fontSize: 11, fontWeight: "700", color: "#FFFFFF" },
-  cardPerfEditBtn: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
+  perfCard: {
     backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
+  perfCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.sm,
+  },
+  perfCardIcon: { fontSize: 16 },
+  perfCardName: { flex: 1, fontSize: 15, fontWeight: "600", color: theme.colors.text.primary },
+  perfAchievedBadge: {
+    backgroundColor: theme.colors.income,
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  perfAchievedBadgeText: { fontSize: 11, fontWeight: "700", color: "#FFFFFF" },
+  perfEditBtn: {
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
     borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.bg,
   },
-  cardPerfEditBtnText: { fontSize: 12, color: theme.colors.primary, fontWeight: "600" },
-  cardPerfNoTarget: { fontSize: 13, color: theme.colors.text.hint },
-  cardPerfTargetLabel: { fontSize: 13, color: theme.colors.text.secondary, marginBottom: theme.spacing.xs },
-  cardPerfProgressRow: {
+  perfEditBtnText: { fontSize: 12, fontWeight: "600", color: theme.colors.primary },
+  perfSeparator: {
+    height: 1,
+    backgroundColor: theme.colors.border,
+    marginVertical: theme.spacing.sm,
+  },
+  perfNoTarget: { fontSize: 13, color: theme.colors.text.hint },
+  perfAmountRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    marginBottom: theme.spacing.sm,
+  },
+  perfSpentAmt: { fontSize: 18, fontWeight: "700", color: theme.colors.text.primary },
+  perfAmountSep: { fontSize: 14, color: theme.colors.text.hint },
+  perfTargetAmt: { fontSize: 14, color: theme.colors.text.secondary },
+  perfProgressRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing.sm,
-    marginBottom: theme.spacing.xs,
   },
-  cardPerfSpent: { fontSize: 13, fontWeight: "600", color: theme.colors.text.primary, minWidth: 80, textAlign: "right" },
-  cardPerfFooter: { flexDirection: "row", justifyContent: "space-between" },
-  cardPerfRemaining: { fontSize: 12, color: theme.colors.text.secondary },
-  cardPerfPct: { fontSize: 12, fontWeight: "700", color: theme.colors.text.primary },
-  cardPerfEditRow: {
+  perfPct: { fontSize: 13, fontWeight: "700", color: theme.colors.text.secondary, minWidth: 36, textAlign: "right" },
+  perfEditRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing.sm,
-    marginTop: theme.spacing.xs,
   },
-  cardPerfInput: {
+  perfInput: {
     flex: 1,
     borderWidth: 1,
     borderColor: theme.colors.primary,
@@ -688,11 +703,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.text.primary,
   },
-  cardPerfSaveBtn: {
+  perfSaveBtn: {
     backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.sm,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.xs + 2,
   },
-  cardPerfSaveBtnText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
+  perfSaveBtnText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
 });
