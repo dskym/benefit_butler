@@ -61,7 +61,7 @@ function buildCalendarDays(year: number, month: number): (Date | null)[] {
 }
 
 function formatAmount(type: string, amount: number): string {
-  const formatted = Math.round(amount).toLocaleString("ko-KR");
+  const formatted = Math.round(Number(amount) || 0).toLocaleString("ko-KR");
   if (type === "income") return `+${formatted}원`;
   if (type === "expense") return `-${formatted}원`;
   return `${formatted}원`;
@@ -171,7 +171,7 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
             <TextInput
               style={styles.input}
               value={amount}
-              onChangeText={setAmount}
+              onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ""))}
               placeholder="예: 15000"
               placeholderTextColor={theme.colors.text.hint}
               keyboardType="numeric"
@@ -319,10 +319,10 @@ export default function TransactionListScreen() {
   const daySummary = useMemo(() => {
     const income = listTx
       .filter((t) => t.type === "income")
-      .reduce((s, t) => s + t.amount, 0);
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const expense = listTx
       .filter((t) => t.type === "expense")
-      .reduce((s, t) => s + t.amount, 0);
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
     return { income, expense };
   }, [listTx]);
 
