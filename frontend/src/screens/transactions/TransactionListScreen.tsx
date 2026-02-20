@@ -108,6 +108,7 @@ function formatAmount(type: string, amount: number): string {
 interface FormModalProps {
   visible: boolean;
   initial?: Transaction | null;
+  prefill?: Transaction | null;       // NEW: favorite re-entry (all fields, date = today)
   initialDate?: string;
   onClose: () => void;
   onSubmit: (
@@ -121,7 +122,7 @@ interface FormModalProps {
   ) => Promise<void>;
 }
 
-function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormModalProps) {
+function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }: FormModalProps) {
   const { categories } = useCategoryStore();
   const { cards, fetchCards, createCard } = useCardStore();
 
@@ -147,22 +148,25 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
 
   useEffect(() => {
     if (visible) {
-      setType(initial?.type === "income" ? "income" : "expense");
-      setAmount(initial ? String(Math.round(Number(initial.amount))) : "");
-      setDescription(initial?.description ?? "");
-      setCategoryId(initial?.category_id ?? "");
+      // src: edit target OR favorite prefill OR null (blank)
+      const src = initial ?? prefill ?? null;
+      setType(src?.type === "income" ? "income" : "expense");
+      setAmount(src ? String(Math.round(Number(src.amount))) : "");
+      setDescription(src?.description ?? "");
+      setCategoryId(src?.category_id ?? "");
+      // For favorite re-entry (prefill, no initial): reset date to today
       setDatetime(
         initial
           ? toLocalDateTime(initial.transacted_at)
           : initialDate ? dateKeyToDateTime(initialDate) : nowLocalDateTime()
       );
-      setPaymentType(initial?.type === "expense" ? (initial.payment_type ?? null) : null);
-      setSelectedCardId(initial?.type === "expense" ? (initial.user_card_id ?? null) : null);
+      setPaymentType(src?.type === "expense" ? (src.payment_type ?? null) : null);
+      setSelectedCardId(src?.type === "expense" ? (src.user_card_id ?? null) : null);
       setNewCardName("");
       setShowAddCard(false);
       fetchCards();
     }
-  }, [visible, initial, initialDate]);
+  }, [visible, initial, prefill, initialDate]);
 
   const handleTypeChange = (newType: "income" | "expense") => {
     setType(newType);
@@ -428,6 +432,47 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
   );
 }
 
+// ── FavoritesRow ──────────────────────────────────────────
+
+interface FavoritesRowProps {
+  favorites: Transaction[];
+  onPress: (fav: Transaction) => void;
+}
+
+function FavoritesRow({ favorites, onPress }: FavoritesRowProps) {
+  const { categories } = useCategoryStore();
+  if (favorites.length === 0) return null;
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.favRow}
+      contentContainerStyle={styles.favRowContent}
+    >
+      {favorites.map((fav) => {
+        const category = categories.find((c) => c.id === fav.category_id);
+        const typeColor = TYPE_COLORS[fav.type] ?? theme.colors.transfer;
+        return (
+          <TouchableOpacity
+            key={fav.id}
+            style={styles.favChip}
+            onPress={() => onPress(fav)}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.favChipDot, { backgroundColor: category?.color ?? typeColor }]} />
+            <Text style={styles.favChipLabel} numberOfLines={1}>
+              {fav.description ?? category?.name ?? (fav.type === "income" ? "수입" : "지출")}
+            </Text>
+            <Text style={styles.favChipAmount}>
+              {Math.round(Number(fav.amount)).toLocaleString("ko-KR")}원
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 // ── 메인 화면 ─────────────────────────────────────────────
 
 export default function TransactionListScreen() {
@@ -442,14 +487,23 @@ export default function TransactionListScreen() {
   const { categories, fetchCategories } = useCategoryStore();
   const { cards, fetchCards } = useCardStore();
 
+  // Step 4: modal state
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editing, setEditing] = useState<Transaction | null>(null);
+
+  // Favorites
+  const { toggleFavorite } = useTransactionStore();
+  const favorites = useMemo(
+    () => transactions.filter((t) => t.is_favorite).slice(0, 10),
+    [transactions]
+  );
+  const [contextTx, setContextTx] = useState<Transaction | null>(null);
+  const [favoritePrefill, setFavoritePrefill] = useState<Transaction | null>(null);
+
   // Step 2: calendar state
   const today = useMemo(() => todayKey(), []);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState<string | null>(today);
-
-  // Step 4: modal state
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editing, setEditing] = useState<Transaction | null>(null);
 
   useEffect(() => {
     fetchTransactions();
@@ -529,13 +583,33 @@ export default function TransactionListScreen() {
     setModalVisible(true);
   };
 
+  const openFromFavorite = (fav: Transaction) => {
+    setEditing(null);
+    setFavoritePrefill(fav);
+    setModalVisible(true);
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!contextTx) return;
+    try {
+      await toggleFavorite(contextTx.id, !contextTx.is_favorite);
+    } catch (e: any) {
+      Alert.alert("오류", e.response?.data?.detail ?? "즐겨찾기 변경에 실패했습니다.");
+    } finally {
+      setContextTx(null);
+    }
+  };
+
   // Step 3: delete handler
   const handleDelete = (item: Transaction) => {
+    const msg = item.is_favorite
+      ? "즐겨찾기에 등록된 항목입니다. 삭제하면 즐겨찾기에서도 제거됩니다."
+      : "이 내역을 삭제할까요?";
     const doDelete = () => deleteTransaction(item.id);
     if (Platform.OS === "web") {
-      if (window.confirm("이 내역을 삭제할까요?")) doDelete();
+      if (window.confirm(msg)) doDelete();
     } else {
-      Alert.alert("삭제", "이 내역을 삭제할까요?", [
+      Alert.alert("삭제", msg, [
         { text: "취소", style: "cancel" },
         { text: "삭제", style: "destructive", onPress: doDelete },
       ]);
@@ -638,6 +712,9 @@ export default function TransactionListScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Favorites quick re-entry row */}
+      <FavoritesRow favorites={favorites} onPress={openFromFavorite} />
+
       {/* Step 2: Calendar section (fixed top) */}
       <View style={styles.calendarSection}>
         {/* Month navigator */}
@@ -715,6 +792,8 @@ export default function TransactionListScreen() {
               <TouchableOpacity
                 style={styles.row}
                 onPress={() => openEdit(item)}
+                onLongPress={() => setContextTx(item)}
+                delayLongPress={400}
                 activeOpacity={0.7}
               >
                 <View style={[styles.typeDot, { backgroundColor: typeColor }]} />
@@ -761,10 +840,45 @@ export default function TransactionListScreen() {
       <FormModal
         visible={modalVisible}
         initial={editing}
+        prefill={editing ? null : favoritePrefill}
         initialDate={editing ? undefined : (selectedDay ?? today)}
-        onClose={() => setModalVisible(false)}
+        onClose={() => {
+          setModalVisible(false);
+          setFavoritePrefill(null);
+        }}
         onSubmit={handleSubmit}
       />
+
+      {/* Long-press context menu */}
+      <Modal
+        visible={!!contextTx}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setContextTx(null)}
+      >
+        <TouchableOpacity
+          style={styles.contextOverlay}
+          activeOpacity={1}
+          onPress={() => setContextTx(null)}
+        >
+          <View style={styles.contextMenu}>
+            <Text style={styles.contextTitle} numberOfLines={1}>
+              {contextTx?.description ?? TYPE_LABELS[contextTx?.type ?? "expense"] ?? "거래"}
+            </Text>
+            <TouchableOpacity style={styles.contextOption} onPress={handleToggleFavorite}>
+              <Text style={styles.contextOptionText}>
+                {contextTx?.is_favorite ? "⭐ 즐겨찾기 해제" : "☆ 즐겨찾기 추가"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.contextCancel}
+              onPress={() => setContextTx(null)}
+            >
+              <Text style={styles.contextCancelText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -1083,4 +1197,89 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   submitBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+
+  // Favorites row
+  favRow: {
+    backgroundColor: theme.colors.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  favRowContent: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    gap: 8,
+  },
+  favChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 6,
+    maxWidth: 200,
+  },
+  favChipDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    flexShrink: 0,
+  },
+  favChipLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.colors.text.primary,
+    flexShrink: 1,
+  },
+  favChipAmount: {
+    fontSize: 12,
+    color: theme.colors.text.secondary,
+    flexShrink: 0,
+  },
+
+  // Context menu
+  contextOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  contextMenu: {
+    backgroundColor: theme.colors.bg,
+    borderRadius: theme.radius.lg,
+    width: 280,
+    overflow: "hidden",
+  },
+  contextTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: theme.colors.text.secondary,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  contextOption: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  contextOptionText: {
+    fontSize: 16,
+    color: theme.colors.text.primary,
+    textAlign: "center",
+  },
+  contextCancel: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  contextCancelText: {
+    fontSize: 16,
+    color: theme.colors.text.secondary,
+    textAlign: "center",
+  },
 });
