@@ -115,12 +115,15 @@ interface FormModalProps {
     amount: string,
     description: string,
     categoryId: string,
-    datetime: string
+    datetime: string,
+    paymentType: string | null,
+    userCardId: string | null
   ) => Promise<void>;
 }
 
 function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormModalProps) {
   const { categories } = useCategoryStore();
+  const { cards, fetchCards, createCard } = useCardStore();
 
   const defaultType: "income" | "expense" =
     initial?.type === "income" ? "income" : "expense";
@@ -136,6 +139,12 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
   );
   const [loading, setLoading] = useState(false);
 
+  // 결제 수단 state (지출일 때만 활성)
+  const [paymentType, setPaymentType] = useState<string | null>(initial?.payment_type ?? null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(initial?.user_card_id ?? null);
+  const [newCardName, setNewCardName] = useState("");
+  const [showAddCard, setShowAddCard] = useState(false);
+
   useEffect(() => {
     if (visible) {
       setType(initial?.type === "income" ? "income" : "expense");
@@ -147,8 +156,49 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
           ? toLocalDateTime(initial.transacted_at)
           : initialDate ? dateKeyToDateTime(initialDate) : nowLocalDateTime()
       );
+      setPaymentType(initial?.type === "expense" ? (initial.payment_type ?? null) : null);
+      setSelectedCardId(initial?.type === "expense" ? (initial.user_card_id ?? null) : null);
+      setNewCardName("");
+      setShowAddCard(false);
+      fetchCards();
     }
   }, [visible, initial, initialDate]);
+
+  const handleTypeChange = (newType: "income" | "expense") => {
+    setType(newType);
+    setCategoryId("");
+    // 수입으로 바꾸면 결제 수단 초기화
+    if (newType === "income") {
+      setPaymentType(null);
+      setSelectedCardId(null);
+      setShowAddCard(false);
+    }
+  };
+
+  const handlePaymentTypeChange = (pt: string) => {
+    setPaymentType(pt);
+    if (pt !== "credit_card" && pt !== "debit_card") {
+      setSelectedCardId(null);
+    }
+    setShowAddCard(false);
+  };
+
+  const handleAddCard = async () => {
+    const trimmed = newCardName.trim();
+    if (!trimmed) return;
+    if (!paymentType || (paymentType !== "credit_card" && paymentType !== "debit_card")) return;
+    try {
+      const newCard = await createCard({
+        type: paymentType as "credit_card" | "debit_card",
+        name: trimmed,
+      });
+      setSelectedCardId(newCard.id);
+      setNewCardName("");
+      setShowAddCard(false);
+    } catch (e: any) {
+      Alert.alert("오류", e.response?.data?.detail ?? "카드 추가에 실패했습니다.");
+    }
+  };
 
   const handleSubmit = async () => {
     if (!amount.trim() || isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -161,7 +211,11 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
     }
     setLoading(true);
     try {
-      await onSubmit(type, amount.trim(), description.trim(), categoryId, datetime);
+      await onSubmit(
+        type, amount.trim(), description.trim(), categoryId, datetime,
+        type === "expense" ? paymentType : null,
+        type === "expense" ? selectedCardId : null
+      );
       onClose();
     } catch (e: any) {
       const msg = e.response?.data?.detail ?? "저장에 실패했습니다.";
@@ -172,15 +226,19 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
   };
 
   const filteredCategories = categories.filter((c) => c.type === type);
-
-  const handleTypeChange = (newType: "income" | "expense") => {
-    setType(newType);
-    setCategoryId("");
-  };
+  const filteredCards = cards.filter((c) => c.type === paymentType);
+  const showCardSection = paymentType === "credit_card" || paymentType === "debit_card";
 
   const FORM_TYPES: { key: "income" | "expense"; label: string; color: string }[] = [
     { key: "income", label: "수입", color: theme.colors.income },
     { key: "expense", label: "지출", color: theme.colors.expense },
+  ];
+
+  const PAYMENT_TYPES: { key: string; label: string }[] = [
+    { key: "cash", label: "현금" },
+    { key: "credit_card", label: "신용카드" },
+    { key: "debit_card", label: "체크카드" },
+    { key: "bank", label: "은행이체" },
   ];
 
   return (
@@ -278,6 +336,77 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
                 </Text>
               )}
             </View>
+
+            {/* 결제 수단 — 지출일 때만 표시 */}
+            {type === "expense" && (
+              <>
+                <Text style={styles.label}>결제 수단</Text>
+                <View style={styles.paymentRow}>
+                  {PAYMENT_TYPES.map((pt) => (
+                    <TouchableOpacity
+                      key={pt.key}
+                      style={[
+                        styles.paymentBtn,
+                        paymentType === pt.key && styles.paymentBtnActive,
+                      ]}
+                      onPress={() => handlePaymentTypeChange(pt.key)}
+                    >
+                      <Text
+                        style={[
+                          styles.paymentBtnText,
+                          paymentType === pt.key && styles.paymentBtnTextActive,
+                        ]}
+                      >
+                        {pt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {showCardSection && (
+                  <View style={styles.cardSection}>
+                    <TouchableOpacity
+                      style={styles.cardRow}
+                      onPress={() => setSelectedCardId(null)}
+                    >
+                      <View style={[styles.radio, !selectedCardId && styles.radioSelected]} />
+                      <Text style={styles.cardRowText}>카드 지정 안함</Text>
+                    </TouchableOpacity>
+
+                    {filteredCards.map((card) => (
+                      <TouchableOpacity
+                        key={card.id}
+                        style={styles.cardRow}
+                        onPress={() => setSelectedCardId(card.id)}
+                      >
+                        <View style={[styles.radio, selectedCardId === card.id && styles.radioSelected]} />
+                        <Text style={styles.cardRowText}>{card.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+
+                    {showAddCard ? (
+                      <View style={styles.addCardRow}>
+                        <TextInput
+                          style={[styles.input, styles.addCardInput]}
+                          value={newCardName}
+                          onChangeText={setNewCardName}
+                          placeholder="카드 이름 입력"
+                          placeholderTextColor={theme.colors.text.hint}
+                          autoFocus
+                        />
+                        <TouchableOpacity style={styles.addCardBtn} onPress={handleAddCard}>
+                          <Text style={styles.addCardBtnText}>추가</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity onPress={() => setShowAddCard(true)}>
+                        <Text style={styles.addCardLink}>+ 새 카드 추가...</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </>
+            )}
 
             <View style={styles.sheetActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
@@ -421,7 +550,9 @@ export default function TransactionListScreen() {
     amount: string,
     description: string,
     categoryId: string,
-    datetime: string
+    datetime: string,
+    paymentType: string | null,
+    userCardId: string | null
   ) => {
     const payload = {
       type,
@@ -429,6 +560,8 @@ export default function TransactionListScreen() {
       description: description || undefined,
       category_id: categoryId || undefined,
       transacted_at: localDateTimeToISO(datetime),
+      payment_type: paymentType as "cash" | "credit_card" | "debit_card" | "bank" | undefined ?? undefined,
+      user_card_id: userCardId || undefined,
     };
     if (editing) {
       await updateTransaction(editing.id, payload);
