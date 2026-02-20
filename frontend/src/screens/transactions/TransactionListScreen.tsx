@@ -50,6 +50,23 @@ function toLocalISODate(iso: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// ISO → "YYYY-MM-DD HH:MM" (로컬 시간)
+function toLocalDateTime(iso: string): string {
+  const d = new Date(iso);
+  return (
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` +
+    ` ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+  );
+}
+
+// "YYYY-MM-DD HH:MM" → ISO (로컬 시간 기준)
+function localDateTimeToISO(dt: string): string {
+  const [datePart, timePart = "00:00"] = dt.split(" ");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute] = timePart.split(":").map(Number);
+  return new Date(year, month - 1, day, hour, minute).toISOString();
+}
+
 function dateToKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -57,6 +74,16 @@ function dateToKey(d: Date): string {
 function todayKey(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// "YYYY-MM-DD" 날짜 키에 현재 시각을 붙여 datetime 문자열 반환
+function dateKeyToDateTime(dateKey: string): string {
+  const d = new Date();
+  return `${dateKey} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function nowLocalDateTime(): string {
+  return dateKeyToDateTime(todayKey());
 }
 
 // 달력 셀 배열: null = 앞 빈칸 패딩
@@ -88,15 +115,12 @@ interface FormModalProps {
     amount: string,
     description: string,
     categoryId: string,
-    date: string,
-    paymentType: string | null,
-    userCardId: string | null
+    datetime: string
   ) => Promise<void>;
 }
 
 function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormModalProps) {
   const { categories } = useCategoryStore();
-  const { cards, fetchCards, createCard } = useCardStore();
 
   const defaultType: "income" | "expense" =
     initial?.type === "income" ? "income" : "expense";
@@ -105,18 +129,12 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
   const [amount, setAmount] = useState(initial ? String(Math.round(Number(initial.amount))) : "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [categoryId, setCategoryId] = useState(initial?.category_id ?? "");
-  const [date, setDate] = useState(
+  const [datetime, setDatetime] = useState(
     initial
-      ? toLocalISODate(initial.transacted_at)
-      : initialDate ?? todayKey()
+      ? toLocalDateTime(initial.transacted_at)
+      : initialDate ? dateKeyToDateTime(initialDate) : nowLocalDateTime()
   );
   const [loading, setLoading] = useState(false);
-
-  // Payment method state
-  const [paymentType, setPaymentType] = useState<string | null>(initial?.payment_type ?? null);
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(initial?.user_card_id ?? null);
-  const [newCardName, setNewCardName] = useState("");
-  const [showAddCard, setShowAddCard] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -124,61 +142,26 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
       setAmount(initial ? String(Math.round(Number(initial.amount))) : "");
       setDescription(initial?.description ?? "");
       setCategoryId(initial?.category_id ?? "");
-      setDate(
+      setDatetime(
         initial
-          ? toLocalISODate(initial.transacted_at)
-          : initialDate ?? todayKey()
+          ? toLocalDateTime(initial.transacted_at)
+          : initialDate ? dateKeyToDateTime(initialDate) : nowLocalDateTime()
       );
-      setPaymentType(initial?.payment_type ?? null);
-      setSelectedCardId(initial?.user_card_id ?? null);
-      setNewCardName("");
-      setShowAddCard(false);
-      fetchCards();
     }
   }, [visible, initial, initialDate]);
-
-  const handlePaymentTypeChange = (pt: string) => {
-    setPaymentType(pt);
-    // Reset card selection when switching away from card types
-    if (pt !== "credit_card" && pt !== "debit_card") {
-      setSelectedCardId(null);
-    }
-    setShowAddCard(false);
-  };
-
-  const handleAddCard = async () => {
-    const trimmed = newCardName.trim();
-    if (!trimmed) return;
-    if (!paymentType || (paymentType !== "credit_card" && paymentType !== "debit_card")) return;
-    try {
-      const newCard = await createCard({
-        type: paymentType as "credit_card" | "debit_card",
-        name: trimmed,
-      });
-      setSelectedCardId(newCard.id);
-      setNewCardName("");
-      setShowAddCard(false);
-    } catch (e: any) {
-      Alert.alert("오류", e.response?.data?.detail ?? "카드 추가에 실패했습니다.");
-    }
-  };
 
   const handleSubmit = async () => {
     if (!amount.trim() || isNaN(Number(amount)) || Number(amount) <= 0) {
       Alert.alert("오류", "올바른 금액을 입력해주세요.");
       return;
     }
-    if (!date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      Alert.alert("오류", "날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)");
-      return;
-    }
-    if (!paymentType) {
-      Alert.alert("오류", "결제 수단을 선택해주세요.");
+    if (!datetime.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)) {
+      Alert.alert("오류", "날짜/시간 형식이 올바르지 않습니다. (YYYY-MM-DD HH:MM)");
       return;
     }
     setLoading(true);
     try {
-      await onSubmit(type, amount.trim(), description.trim(), categoryId, date, paymentType, selectedCardId);
+      await onSubmit(type, amount.trim(), description.trim(), categoryId, datetime);
       onClose();
     } catch (e: any) {
       const msg = e.response?.data?.detail ?? "저장에 실패했습니다.";
@@ -189,7 +172,6 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
   };
 
   const filteredCategories = categories.filter((c) => c.type === type);
-  const filteredCards = cards.filter((c) => c.type === paymentType);
 
   const handleTypeChange = (newType: "income" | "expense") => {
     setType(newType);
@@ -200,15 +182,6 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
     { key: "income", label: "수입", color: theme.colors.income },
     { key: "expense", label: "지출", color: theme.colors.expense },
   ];
-
-  const PAYMENT_TYPES: { key: string; label: string }[] = [
-    { key: "cash", label: "현금" },
-    { key: "credit_card", label: "신용카드" },
-    { key: "debit_card", label: "체크카드" },
-    { key: "bank", label: "은행이체" },
-  ];
-
-  const showCardSection = paymentType === "credit_card" || paymentType === "debit_card";
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -246,14 +219,15 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
               keyboardType="numeric"
             />
 
-            <Text style={styles.label}>날짜 (YYYY-MM-DD)</Text>
+            <Text style={styles.label}>날짜 및 시간 (YYYY-MM-DD HH:MM)</Text>
             <TextInput
               style={styles.input}
-              value={date}
-              onChangeText={setDate}
-              placeholder="2024-01-01"
+              value={datetime}
+              onChangeText={setDatetime}
+              placeholder="2024-01-01 14:30"
               placeholderTextColor={theme.colors.text.hint}
               autoCapitalize="none"
+              keyboardType="numbers-and-punctuation"
             />
 
             <Text style={styles.label}>메모 (선택)</Text>
@@ -304,76 +278,6 @@ function FormModal({ visible, initial, initialDate, onClose, onSubmit }: FormMod
                 </Text>
               )}
             </View>
-
-            {/* Payment method section */}
-            <Text style={styles.label}>결제 수단</Text>
-            <View style={styles.paymentRow}>
-              {PAYMENT_TYPES.map((pt) => (
-                <TouchableOpacity
-                  key={pt.key}
-                  style={[
-                    styles.paymentBtn,
-                    paymentType === pt.key && styles.paymentBtnActive,
-                  ]}
-                  onPress={() => handlePaymentTypeChange(pt.key)}
-                >
-                  <Text
-                    style={[
-                      styles.paymentBtnText,
-                      paymentType === pt.key && styles.paymentBtnTextActive,
-                    ]}
-                  >
-                    {pt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Card list — shown when credit or debit is selected */}
-            {showCardSection && (
-              <View style={styles.cardSection}>
-                {/* "카드 지정 안함" option */}
-                <TouchableOpacity
-                  style={styles.cardRow}
-                  onPress={() => setSelectedCardId(null)}
-                >
-                  <View style={[styles.radio, !selectedCardId && styles.radioSelected]} />
-                  <Text style={styles.cardRowText}>카드 지정 안함</Text>
-                </TouchableOpacity>
-
-                {filteredCards.map((card) => (
-                  <TouchableOpacity
-                    key={card.id}
-                    style={styles.cardRow}
-                    onPress={() => setSelectedCardId(card.id)}
-                  >
-                    <View style={[styles.radio, selectedCardId === card.id && styles.radioSelected]} />
-                    <Text style={styles.cardRowText}>{card.name}</Text>
-                  </TouchableOpacity>
-                ))}
-
-                {/* Add new card */}
-                {showAddCard ? (
-                  <View style={styles.addCardRow}>
-                    <TextInput
-                      style={[styles.input, styles.addCardInput]}
-                      value={newCardName}
-                      onChangeText={setNewCardName}
-                      placeholder="카드 이름 입력"
-                      placeholderTextColor={theme.colors.text.hint}
-                      autoFocus
-                    />
-                    <TouchableOpacity style={styles.addCardBtn} onPress={handleAddCard}>
-                      <Text style={styles.addCardBtnText}>추가</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity onPress={() => setShowAddCard(true)}>
-                    <Text style={styles.addCardLink}>+ 새 카드 추가...</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
 
             <View style={styles.sheetActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
@@ -517,18 +421,14 @@ export default function TransactionListScreen() {
     amount: string,
     description: string,
     categoryId: string,
-    date: string,
-    paymentType: string | null,
-    userCardId: string | null
+    datetime: string
   ) => {
     const payload = {
       type,
       amount: Number(amount),
       description: description || undefined,
       category_id: categoryId || undefined,
-      transacted_at: new Date(date).toISOString(),
-      payment_type: paymentType as "cash" | "credit_card" | "debit_card" | "bank" | undefined,
-      user_card_id: userCardId || undefined,
+      transacted_at: localDateTimeToISO(datetime),
     };
     if (editing) {
       await updateTransaction(editing.id, payload);
