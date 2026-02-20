@@ -12,6 +12,7 @@ import AnalysisScreen from "../screens/analysis/AnalysisScreen";
 import SettingsScreen from "../screens/settings/SettingsScreen";
 import CategoryListScreen from "../screens/categories/CategoryListScreen";
 import CardListScreen from "../screens/settings/CardListScreen";
+import PrivacyPolicyScreen from "../screens/settings/PrivacyPolicyScreen";
 import { useAuthStore } from "../store/authStore";
 import { theme } from "../theme";
 
@@ -51,6 +52,16 @@ function SettingsNavigator() {
         component={CardListScreen}
         options={{
           title: "카드 관리",
+          headerStyle: { backgroundColor: theme.colors.bg },
+          headerTintColor: theme.colors.primary,
+          headerTitleStyle: { color: theme.colors.text.primary, fontWeight: "700" },
+        }}
+      />
+      <SettingsStack.Screen
+        name="PrivacyPolicy"
+        component={PrivacyPolicyScreen}
+        options={{
+          title: "개인정보 처리방침",
           headerStyle: { backgroundColor: theme.colors.bg },
           headerTintColor: theme.colors.primary,
           headerTitleStyle: { color: theme.colors.text.primary, fontWeight: "700" },

@@ -71,10 +71,18 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>앱 정보</Text>
         <View style={styles.sectionCard}>
-          <View style={[styles.row, styles.rowLast]}>
+          <View style={styles.row}>
             <Text style={styles.rowLabel}>버전</Text>
             <Text style={styles.rowValue}>1.0.0</Text>
           </View>
+          <TouchableOpacity
+            style={[styles.row, styles.rowLast]}
+            onPress={() => navigation.navigate("PrivacyPolicy")}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.rowLabel}>개인정보 처리방침</Text>
+            <Text style={styles.rowChevron}>›</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
