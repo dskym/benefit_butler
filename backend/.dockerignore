@@ -1,0 +1,22 @@
+# Python virtualenv — 컨테이너에서 system Python으로 재설치
+.venv/
+
+# 컴파일된 바이트코드
+__pycache__/
+*.pyc
+*.pyo
+
+# 테스트 — 호스트에서 실행 (testcontainers는 Docker-in-Docker 필요)
+tests/
+.pytest_cache/
+pytest.ini
+requirements-test.txt
+
+# 로컬 .env — docker-compose environment:로 주입
+.env
+
+# 개발 도구
+.git/
+.gitignore
+*.md
+.worktrees/
