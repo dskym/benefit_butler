@@ -1,9 +1,12 @@
 // frontend/src/navigation/index.tsx
 import React, { useEffect } from "react";
+import { View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
+import { OfflineBanner } from "../components/OfflineBanner";
 
 import LoginScreen from "../screens/auth/LoginScreen";
 import RegisterScreen from "../screens/auth/RegisterScreen";
@@ -105,17 +108,26 @@ function MainNavigator() {
 }
 
 export default function RootNavigation() {
-  const { user, isLoading, fetchMe } = useAuthStore();
+  const { user, isLoading } = useAuthStore();
+  const fetchMe = useAuthStore((s) => s.fetchMe);
+  const { isOnline } = useNetworkStatus();
 
   useEffect(() => {
-    fetchMe();
+    if (isOnline) {
+      fetchMe();
+    } else {
+      useAuthStore.setState({ isLoading: false });
+    }
   }, []);
 
   if (isLoading) return null;
 
   return (
-    <NavigationContainer>
-      {user !== null ? <MainNavigator /> : <AuthNavigator />}
-    </NavigationContainer>
+    <View style={{ flex: 1 }}>
+      <NavigationContainer>
+        {user !== null ? <MainNavigator /> : <AuthNavigator />}
+      </NavigationContainer>
+      <OfflineBanner isOnline={isOnline} />
+    </View>
   );
 }
