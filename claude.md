@@ -166,6 +166,7 @@ cd backend && python -m pytest tests/ -v   # 전체 테스트 실행
 - **main 브랜치에 직접 커밋하지 않는다** — 모든 변경사항은 feature 브랜치에서 작업 후 PR을 통해 머지
 - 브랜치명 형식: `feature/<작업명>`, `fix/<버그명>`, `docs/<문서명>`
 - PR 없이 main에 push하지 않는다
+- **PR을 main에 머지할 때는 반드시 사용자의 명시적 승인을 받은 후 진행한다**
 
 ## 🛠 Development Guidelines
 - **Cross-Platform First**: 플랫폼 간 UI 일관성을 유지하되, iOS/Android 특화 기능(알림 접근 등)은 인터페이스화하여 분리
