@@ -7,6 +7,8 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import { OfflineBanner } from "../components/OfflineBanner";
+import { useSmsAutoImport } from "../hooks/useSmsAutoImport";
+import { usePushAutoImport } from "../hooks/usePushAutoImport";
 
 import LoginScreen from "../screens/auth/LoginScreen";
 import RegisterScreen from "../screens/auth/RegisterScreen";
@@ -108,6 +110,8 @@ function MainNavigator() {
 }
 
 export default function RootNavigation() {
+  useSmsAutoImport();    // Android 전용, 내부 Platform 가드 있음
+  usePushAutoImport();   // Android 전용, 내부 Platform 가드 있음
   const { user, isLoading } = useAuthStore();
   const fetchMe = useAuthStore((s) => s.fetchMe);
   const { isOnline } = useNetworkStatus();

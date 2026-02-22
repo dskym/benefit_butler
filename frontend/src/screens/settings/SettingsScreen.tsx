@@ -2,20 +2,30 @@
 import React from "react";
 import {
   Alert,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../store/authStore";
+import { useFinancialImportStore } from "../../store/financialImportStore";
 import { theme } from "../../theme";
 
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
   const { user, logout } = useAuthStore();
+  const {
+    isSmsEnabled,
+    isPushEnabled,
+    isImporting,
+    setSmsEnabled,
+    setPushEnabled,
+  } = useFinancialImportStore();
 
   const handleLogout = () => {
     if (Platform.OS === "web") {
@@ -48,6 +58,49 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>관리</Text>
         <View style={styles.sectionCard}>
+          {Platform.OS === 'android' && (
+            <>
+              <View style={styles.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>SMS 자동 임포트</Text>
+                  <Text style={styles.rowSub}>
+                    {isImporting ? '가져오는 중...' : '금융 SMS 거래 자동 추가'}
+                  </Text>
+                </View>
+                <Switch
+                  value={isSmsEnabled}
+                  onValueChange={setSmsEnabled}
+                  trackColor={{ true: theme.colors.primary, false: theme.colors.border }}
+                  thumbColor="#fff"
+                  disabled={isImporting}
+                />
+              </View>
+              <View style={styles.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>푸시 알림 자동 임포트</Text>
+                  <Text style={styles.rowSub}>금융앱 푸시 알림 거래 자동 추가</Text>
+                </View>
+                <Switch
+                  value={isPushEnabled}
+                  onValueChange={setPushEnabled}
+                  trackColor={{ true: theme.colors.primary, false: theme.colors.border }}
+                  thumbColor="#fff"
+                />
+              </View>
+              {isPushEnabled && (
+                <TouchableOpacity
+                  style={styles.row}
+                  onPress={() => Linking.openSettings()}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.rowLabel, { color: theme.colors.primary }]}>
+                    알림 접근 권한 설정
+                  </Text>
+                  <Text style={styles.rowChevron}>›</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
           <TouchableOpacity
             style={styles.row}
             onPress={() => navigation.navigate("CategoryList")}
@@ -145,6 +198,7 @@ const styles = StyleSheet.create({
   rowLabel: { flex: 1, fontSize: 16, color: theme.colors.text.primary },
   rowChevron: { fontSize: 20, color: theme.colors.text.hint },
   rowValue: { fontSize: 15, color: theme.colors.text.secondary },
+  rowSub: { fontSize: 12, color: theme.colors.text.secondary, marginTop: 2 },
   logoutBtn: {
     backgroundColor: theme.colors.bg,
     borderRadius: theme.radius.lg,
