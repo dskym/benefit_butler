@@ -21,10 +21,11 @@ export interface NetworkStatus {
 }
 
 function computeIsOnline(s: NetInfoState): boolean {
-  // isInternetReachable이 HTTP 수준에서 확인된 값이면 우선 사용
-  if (s.isInternetReachable !== null) return s.isInternetReachable;
-  // null(아직 미확인)인 경우 isConnected로 낙관적 판단 (null은 온라인으로 처리)
-  return s.isConnected !== false;
+  // HTTP 검사 결과가 명확히 false일 때만 오프라인 처리.
+  // null(아직 미확인)인 경우 isConnected와 무관하게 낙관적으로 온라인으로 처리.
+  // 이렇게 해야 Galaxy처럼 isConnected:false를 잘못 반환하는 기기에서
+  // HTTP 검사가 완료되기 전 오프라인 배너가 뜨는 것을 방지할 수 있다.
+  return s.isInternetReachable !== false;
 }
 
 export function useNetworkStatus(): NetworkStatus {

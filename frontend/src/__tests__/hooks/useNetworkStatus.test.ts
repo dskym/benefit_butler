@@ -26,35 +26,36 @@ describe('useNetworkStatus', () => {
     expect(result.current.isOnline).toBe(true);
   });
 
-  it('updates when disconnected', () => {
+  it('isInternetReachable: false이면 오프라인', () => {
     const { result } = renderHook(() => useNetworkStatus());
     act(() => { capturedListener?.({ isConnected: false, isInternetReachable: false }); });
     expect(result.current.isOnline).toBe(false);
   });
 
-  it('updates when reconnected', () => {
-    const { result } = renderHook(() => useNetworkStatus());
-    act(() => { capturedListener?.({ isConnected: false, isInternetReachable: false }); });
-    act(() => { capturedListener?.({ isConnected: true, isInternetReachable: true }); });
-    expect(result.current.isOnline).toBe(true);
-  });
-
-  it('treats isConnected: null as online (Android 전환 상태 대응)', () => {
-    const { result } = renderHook(() => useNetworkStatus());
-    act(() => { capturedListener?.({ isConnected: null, isInternetReachable: null }); });
-    expect(result.current.isOnline).toBe(true);
-  });
-
-  it('isInternetReachable: true가 isConnected: false보다 우선한다 (Galaxy NET_CAPABILITY_VALIDATED 오보 대응)', () => {
+  it('isInternetReachable: true이면 온라인 (isConnected 무관)', () => {
     const { result } = renderHook(() => useNetworkStatus());
     act(() => { capturedListener?.({ isConnected: false, isInternetReachable: true }); });
     expect(result.current.isOnline).toBe(true);
   });
 
-  it('isInternetReachable: false가 isConnected: true보다 우선한다', () => {
+  it('isInternetReachable: null이면 온라인 (HTTP 검사 대기 중, 낙관적 처리)', () => {
     const { result } = renderHook(() => useNetworkStatus());
-    act(() => { capturedListener?.({ isConnected: true, isInternetReachable: false }); });
+    act(() => { capturedListener?.({ isConnected: false, isInternetReachable: null }); });
+    expect(result.current.isOnline).toBe(true);
+  });
+
+  it('isConnected: null, isInternetReachable: null이면 온라인 (낙관적)', () => {
+    const { result } = renderHook(() => useNetworkStatus());
+    act(() => { capturedListener?.({ isConnected: null, isInternetReachable: null }); });
+    expect(result.current.isOnline).toBe(true);
+  });
+
+  it('재연결 시 온라인으로 복귀', () => {
+    const { result } = renderHook(() => useNetworkStatus());
+    act(() => { capturedListener?.({ isConnected: false, isInternetReachable: false }); });
     expect(result.current.isOnline).toBe(false);
+    act(() => { capturedListener?.({ isConnected: true, isInternetReachable: true }); });
+    expect(result.current.isOnline).toBe(true);
   });
 
   it('unsubscribes on unmount', () => {

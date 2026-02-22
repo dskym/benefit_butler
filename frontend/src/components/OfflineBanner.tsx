@@ -1,15 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Platform, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { usePendingMutationsStore } from '../store/pendingMutationsStore';
 
 interface Props { isOnline: boolean; }
 
 export function OfflineBanner({ isOnline }: Props) {
   const { top } = useSafeAreaInsets();
-  const pendingCount = usePendingMutationsStore((s) => s.queue.length);
   const translateY = useRef(new Animated.Value(-44)).current;
-  const shouldShow = !isOnline || pendingCount > 0;
+  const shouldShow = !isOnline;
 
   useEffect(() => {
     Animated.timing(translateY, {
@@ -19,15 +17,9 @@ export function OfflineBanner({ isOnline }: Props) {
     }).start();
   }, [shouldShow, translateY]);
 
-  const isSyncing = isOnline && pendingCount > 0;
-  const bgColor = isSyncing ? '#3182F6' : '#FF9500';
-  const message = isSyncing
-    ? `동기화 중... (${pendingCount}개 남음)`
-    : '오프라인 모드 — 연결 시 자동 동기화됩니다';
-
   return (
-    <Animated.View style={[styles.banner, { top, backgroundColor: bgColor, transform: [{ translateY }] }]}>
-      <Text style={styles.text}>{message}</Text>
+    <Animated.View style={[styles.banner, { top, transform: [{ translateY }] }]}>
+      <Text style={styles.text}>오프라인 모드 — 연결 시 자동 동기화됩니다</Text>
     </Animated.View>
   );
 }
@@ -35,6 +27,7 @@ export function OfflineBanner({ isOnline }: Props) {
 const styles = StyleSheet.create({
   banner: {
     position: 'absolute', top: 0, left: 0, right: 0, height: 36,
+    backgroundColor: '#FF9500',
     justifyContent: 'center', alignItems: 'center', zIndex: 999,
   },
   text: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
