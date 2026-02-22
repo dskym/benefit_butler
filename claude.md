@@ -160,6 +160,12 @@ cd backend && python -m pytest tests/ -v   # 전체 테스트 실행
 - 테스트 없이 머지하지 않는다
 - 실패 케이스(경계값, 권한 오류, 존재하지 않는 리소스)를 반드시 커버
 
+## 🌿 Git Workflow
+
+- **main 브랜치에 직접 커밋하지 않는다** — 모든 변경사항은 feature 브랜치에서 작업 후 PR을 통해 머지
+- 브랜치명 형식: `feature/<작업명>`, `fix/<버그명>`, `docs/<문서명>`
+- PR 없이 main에 push하지 않는다
+
 ## 🛠 Development Guidelines
 - **Cross-Platform First**: 플랫폼 간 UI 일관성을 유지하되, iOS/Android 특화 기능(알림 접근 등)은 인터페이스화하여 분리
 - **Data Integrity**: 엑셀 업로드 시 중복 데이터 체크 로직 필수
