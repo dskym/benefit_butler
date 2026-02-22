@@ -33,7 +33,7 @@ const tokenStorage = {
   },
 };
 
-export const apiClient = axios.create({ baseURL: BASE_URL });
+export const apiClient = axios.create({ baseURL: BASE_URL, timeout: 10000 });
 
 // Request interceptor: JWT 자동 첨부
 apiClient.interceptors.request.use(async (config) => {
