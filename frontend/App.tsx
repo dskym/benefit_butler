@@ -1,6 +1,7 @@
 // frontend/App.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RootNavigation from './src/navigation';
 import { initStorage } from './src/storage';
 import { useNetworkStatus } from './src/hooks/useNetworkStatus';
@@ -49,7 +50,9 @@ export default function App() {
   );
   return (
     <ErrorBoundary>
-      <RootNavigation />
+      <SafeAreaProvider>
+        <RootNavigation />
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }
