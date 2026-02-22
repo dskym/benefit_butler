@@ -44,6 +44,10 @@ const transportCategory = makeCategory({ id: 'cat-transport', name: '교통',   
 const uiroCategory      = makeCategory({ id: 'cat-uiro',      name: '의료·건강', type: 'expense' });
 const jugeoCategory     = makeCategory({ id: 'cat-jugeo',     name: '주거·통신', type: 'expense' });
 const shoppingCategory  = makeCategory({ id: 'cat-shopping',  name: '쇼핑',     type: 'expense' });
+const cultCategory      = makeCategory({ id: 'cat-cult',      name: '문화·여가', type: 'expense' });
+const eduCategory       = makeCategory({ id: 'cat-edu',       name: '교육',     type: 'expense' });
+const financeCategory   = makeCategory({ id: 'cat-finance',   name: '금융',     type: 'expense' });
+const celebCategory     = makeCategory({ id: 'cat-celeb',     name: '경조사',   type: 'expense' });
 const shikbiIncomeCategory = makeCategory({ id: 'cat-income', name: '식비',     type: 'income' });
 
 const defaultCategories: Category[] = [
@@ -52,6 +56,10 @@ const defaultCategories: Category[] = [
   uiroCategory,
   jugeoCategory,
   shoppingCategory,
+  cultCategory,
+  eduCategory,
+  financeCategory,
+  celebCategory,
   shikbiIncomeCategory,
 ];
 
@@ -181,5 +189,59 @@ describe('suggestCategory', () => {
   it('returns 주거·통신 for telecom keywords', () => {
     const result = suggestCategory('SKT 자동이체', 'expense', [], defaultCategories);
     expect(result).toEqual({ categoryId: 'cat-jugeo', method: 'keyword' });
+  });
+
+  // 13. 문화·여가 — OTT
+  it('returns 문화·여가 for OTT service keywords', () => {
+    const result = suggestCategory('넷플릭스', 'expense', [], defaultCategories);
+    expect(result).toEqual({ categoryId: 'cat-cult', method: 'keyword' });
+  });
+
+  // 14. 문화·여가 — 영화관
+  it('returns 문화·여가 for cinema keywords', () => {
+    const result = suggestCategory('CGV 강남', 'expense', [], defaultCategories);
+    expect(result).toEqual({ categoryId: 'cat-cult', method: 'keyword' });
+  });
+
+  // 15. 문화·여가 — 여행
+  it('returns 문화·여가 for travel keywords', () => {
+    const result = suggestCategory('야놀자 호텔예약', 'expense', [], defaultCategories);
+    expect(result).toEqual({ categoryId: 'cat-cult', method: 'keyword' });
+  });
+
+  // 16. 교육 — 온라인 강의
+  it('returns 교육 for online education keywords', () => {
+    const result = suggestCategory('인프런 강의결제', 'expense', [], defaultCategories);
+    expect(result).toEqual({ categoryId: 'cat-edu', method: 'keyword' });
+  });
+
+  // 17. 교육 — 어학원
+  it('returns 교육 for language school keywords', () => {
+    const result = suggestCategory('해커스토익 수강료', 'expense', [], defaultCategories);
+    expect(result).toEqual({ categoryId: 'cat-edu', method: 'keyword' });
+  });
+
+  // 18. 금융 — 보험료
+  it('returns 금융 for insurance keywords', () => {
+    const result = suggestCategory('삼성화재 보험료', 'expense', [], defaultCategories);
+    expect(result).toEqual({ categoryId: 'cat-finance', method: 'keyword' });
+  });
+
+  // 19. 경조사 — 꽃집
+  it('returns 경조사 for flower shop keywords', () => {
+    const result = suggestCategory('강남꽃집', 'expense', [], defaultCategories);
+    expect(result).toEqual({ categoryId: 'cat-celeb', method: 'keyword' });
+  });
+
+  // 20. 쇼핑 — 백화점
+  it('returns 쇼핑 for department store keywords', () => {
+    const result = suggestCategory('롯데백화점 본점', 'expense', [], defaultCategories);
+    expect(result).toEqual({ categoryId: 'cat-shopping', method: 'keyword' });
+  });
+
+  // 21. 교통 — 항공
+  it('returns 교통 for airline keywords', () => {
+    const result = suggestCategory('제주항공 예매', 'expense', [], defaultCategories);
+    expect(result).toEqual({ categoryId: 'cat-transport', method: 'keyword' });
   });
 });
