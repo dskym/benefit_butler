@@ -1,6 +1,6 @@
 // frontend/src/navigation/index.tsx
 import React, { useEffect } from "react";
-import { View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -124,7 +124,11 @@ export default function RootNavigation() {
     }
   }, []);
 
-  if (isLoading) return null;
+  if (isLoading) return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+      <ActivityIndicator size="large" color={theme.colors.primary} />
+    </View>
+  );
 
   return (
     <View style={{ flex: 1 }}>

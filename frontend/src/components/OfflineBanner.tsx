@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text } from 'react-native';
+import { Animated, Platform, StyleSheet, Text } from 'react-native';
 import { usePendingMutationsStore } from '../store/pendingMutationsStore';
 
 interface Props { isOnline: boolean; }
@@ -13,7 +13,7 @@ export function OfflineBanner({ isOnline }: Props) {
     Animated.timing(translateY, {
       toValue: shouldShow ? 0 : -44,
       duration: 250,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [shouldShow, translateY]);
 
