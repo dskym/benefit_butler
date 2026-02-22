@@ -14,10 +14,10 @@ export function useNetworkStatus(): NetworkStatus {
 
   useEffect(() => {
     NetInfo.fetch().then((s: NetInfoState) =>
-      setStatus({ isOnline: s.isConnected ?? false, isInternetReachable: s.isInternetReachable }),
+      setStatus({ isOnline: s.isConnected !== false, isInternetReachable: s.isInternetReachable }),
     );
     const unsubscribe = NetInfo.addEventListener((s: NetInfoState) =>
-      setStatus({ isOnline: s.isConnected ?? false, isInternetReachable: s.isInternetReachable }),
+      setStatus({ isOnline: s.isConnected !== false, isInternetReachable: s.isInternetReachable }),
     );
     return unsubscribe;
   }, []);
