@@ -19,6 +19,7 @@ import { useCardStore } from "../../store/cardStore";
 import { Transaction } from "../../types";
 import { theme } from "../../theme";
 import { suggestCategory } from "../../utils/categoryKeywords";
+import { useNetworkStatus } from "../../hooks/useNetworkStatus";
 
 // ── 상수 ─────────────────────────────────────────────────
 
@@ -546,6 +547,7 @@ export default function TransactionListScreen() {
   } = useTransactionStore();
   const { categories, fetchCategories } = useCategoryStore();
   const { cards, fetchCards } = useCardStore();
+  const { isOnline } = useNetworkStatus();
 
   // Step 4: modal state
   const [modalVisible, setModalVisible] = useState(false);
@@ -665,7 +667,7 @@ export default function TransactionListScreen() {
     const msg = item.is_favorite
       ? "즐겨찾기에 등록된 항목입니다. 삭제하면 즐겨찾기에서도 제거됩니다."
       : "이 내역을 삭제할까요?";
-    const doDelete = () => deleteTransaction(item.id);
+    const doDelete = () => deleteTransaction(item.id, isOnline);
     if (Platform.OS === "web") {
       if (window.confirm(msg)) doDelete();
     } else {
@@ -695,9 +697,9 @@ export default function TransactionListScreen() {
       user_card_id: userCardId || undefined,
     };
     if (editing) {
-      await updateTransaction(editing.id, payload);
+      await updateTransaction(editing.id, payload, isOnline);
     } else {
-      await createTransaction(payload);
+      await createTransaction(payload, isOnline);
     }
   };
 
@@ -878,6 +880,9 @@ export default function TransactionListScreen() {
                 <Text style={[styles.rowAmount, { color: typeColor }]}>
                   {formatAmount(item.type, item.amount)}
                 </Text>
+                {item._isPending && (
+                  <Text style={{ fontSize: 10, color: '#FF9500', marginRight: 4 }}>↻</Text>
+                )}
                 <TouchableOpacity
                   style={styles.deleteBtn}
                   onPress={() => handleDelete(item)}

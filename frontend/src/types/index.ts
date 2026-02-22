@@ -40,9 +40,19 @@ export interface Transaction {
   payment_type: "cash" | "credit_card" | "debit_card" | "bank" | null;
   user_card_id: string | null;
   is_favorite?: boolean;
+  _isPending?: boolean;
 }
 
 export interface TokenResponse {
   access_token: string;
   token_type: string;
+}
+
+export interface PendingMutation {
+  id: string;
+  type: 'CREATE' | 'UPDATE' | 'DELETE' | 'TOGGLE_FAVORITE';
+  resource: 'transaction';
+  payload: unknown;
+  localId?: string;   // CREATE 시 임시 UUID
+  createdAt: number;
 }

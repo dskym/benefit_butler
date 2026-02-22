@@ -1,7 +1,26 @@
 // src/__tests__/store/transactionStore.test.ts
 
+jest.mock('../../storage', () => ({
+  mmkvStorage: { getItem: jest.fn().mockReturnValue(null), setItem: jest.fn(), removeItem: jest.fn() },
+  createPlatformStorage: jest.fn(() => ({
+    getItem: jest.fn().mockReturnValue(null),
+    setItem: jest.fn(),
+    removeItem: jest.fn(),
+  })),
+}));
+jest.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+jest.mock('../../store/pendingMutationsStore', () => {
+  const enqueue = jest.fn().mockReturnValue('mut-id');
+  return {
+    usePendingMutationsStore: {
+      getState: jest.fn(() => ({ enqueue })),
+    },
+  };
+});
+
 import { useTransactionStore } from "../../store/transactionStore";
 import { apiClient } from "../../services/api";
+import { usePendingMutationsStore } from "../../store/pendingMutationsStore";
 
 jest.mock("../../services/api", () => ({
   apiClient: {
@@ -229,5 +248,81 @@ describe("toggleFavorite", () => {
       useTransactionStore.getState().transactions.find((t) => t.id === "t2")
         ?.is_favorite
     ).toBe(false);
+  });
+});
+
+// ─── replaceLocalTransaction ──────────────────────────────────────────────────
+
+describe("replaceLocalTransaction", () => {
+  it("replaces temp-id transaction with server version", () => {
+    const mockTx = makeTransaction("local-uuid", 5000);
+    useTransactionStore.setState({ transactions: [{ ...mockTx, _isPending: true }] });
+    useTransactionStore.getState().replaceLocalTransaction("local-uuid", { ...mockTx, id: "server-id" });
+    expect(useTransactionStore.getState().transactions[0].id).toBe("server-id");
+  });
+
+  it("does not affect other transactions", () => {
+    const mockTx = makeTransaction("local-uuid", 5000);
+    useTransactionStore.setState({
+      transactions: [makeTransaction("other", 9000), { ...mockTx, _isPending: true }],
+    });
+    useTransactionStore.getState().replaceLocalTransaction("local-uuid", { ...mockTx, id: "srv" });
+    expect(useTransactionStore.getState().transactions.find((t) => t.id === "other")).toBeDefined();
+  });
+});
+
+// ─── createTransaction (offline) ─────────────────────────────────────────────
+
+describe("createTransaction (offline)", () => {
+  it("creates optimistic transaction without API call", async () => {
+    await useTransactionStore.getState().createTransaction(
+      { type: "expense", amount: 5000, transacted_at: "2026-01-15T12:00:00Z" },
+      false,
+    );
+    expect(apiClient.post).not.toHaveBeenCalled();
+    const { transactions } = useTransactionStore.getState();
+    expect(transactions).toHaveLength(1);
+    expect(transactions[0]._isPending).toBe(true);
+  });
+
+  it("enqueues CREATE mutation with localId", async () => {
+    const { enqueue } = usePendingMutationsStore.getState();
+    await useTransactionStore.getState().createTransaction(
+      { type: "expense", amount: 5000, transacted_at: "2026-01-15T12:00:00Z" },
+      false,
+    );
+    expect(enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "CREATE",
+        resource: "transaction",
+        localId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      }),
+    );
+  });
+});
+
+// ─── updateTransaction (offline) ─────────────────────────────────────────────
+
+describe("updateTransaction (offline)", () => {
+  it("applies optimistic update without API call", async () => {
+    useTransactionStore.setState({
+      transactions: [makeTransaction("t1", 10000)],
+    });
+    await useTransactionStore.getState().updateTransaction("t1", { amount: 12000 }, false);
+    expect(apiClient.put).not.toHaveBeenCalled();
+    expect(
+      useTransactionStore.getState().transactions.find((t) => t.id === "t1")?.amount,
+    ).toBe(12000);
+  });
+});
+
+// ─── deleteTransaction (offline) ─────────────────────────────────────────────
+
+describe("deleteTransaction (offline)", () => {
+  it("removes optimistically without API call", async () => {
+    useTransactionStore.setState({ transactions: [makeTransaction("t1", 10000)] });
+    await useTransactionStore.getState().deleteTransaction("t1", false);
+    expect(apiClient.delete).not.toHaveBeenCalled();
+    expect(useTransactionStore.getState().transactions).toHaveLength(0);
   });
 });
