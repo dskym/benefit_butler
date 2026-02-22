@@ -11,11 +11,13 @@
 ## 🛠 Tech Stack
 - **Frontend**: React Native (Expo SDK 54) — iOS/Android/Web 대응
   - Navigation: `@react-navigation/native`, `@react-navigation/bottom-tabs`, `@react-navigation/native-stack`
-  - State: `zustand`
+  - State: `zustand` (persist middleware로 로컬 영속화)
   - HTTP: `axios`
   - Charts: `react-native-gifted-charts` + `react-native-svg`
   - Icons: `@expo/vector-icons` (Ionicons)
   - Auth Storage: `expo-secure-store` (native) / `localStorage` (web)
+  - Offline Storage: `react-native-mmkv` (AES 암호화, native only) / `@react-native-async-storage/async-storage` (web fallback)
+  - Network: `@react-native-community/netinfo` (연결 상태 감지)
 - **Backend**: Python (FastAPI)
 - **Database**: PostgreSQL (회원 정보, 결제 내역, 카드 메타데이터 관리)
 - **Auth**: JWT 기반 인증 (OAuth2.0 카카오/구글 소셜 로그인 권장)
@@ -55,21 +57,36 @@ cd frontend && npx expo start --web   # 웹 개발
 cd frontend && npx expo start         # 네이티브 (Expo Go)
 ```
 
+> ⚠️ **MMKV 주의**: `react-native-mmkv`는 native module이므로 Expo Go에서 동작하지 않음.
+> 네이티브 개발 시 반드시 개발 빌드 사용:
+> ```bash
+> cd frontend && npx expo prebuild --clean && npx expo run:ios
+> ```
+
 ### 파일 구조
 ```
 frontend/src/
 ├── theme.ts                          # 디자인 토큰 (색상/간격/타이포 — 모든 화면이 이 파일 참조)
-├── navigation/index.tsx              # RootNavigation: Auth/Main 분기
+├── navigation/index.tsx              # RootNavigation: Auth/Main 분기 + OfflineBanner
 ├── screens/
 │   ├── auth/        LoginScreen, RegisterScreen
 │   ├── home/        HomeScreen          ← 메인 대시보드 (차트 포함)
-│   ├── transactions/ TransactionListScreen  ← CRUD + 필터/섹션
+│   ├── transactions/ TransactionListScreen  ← CRUD + 필터/섹션 + 오프라인 지원
 │   ├── analysis/    AnalysisScreen      ← 월별 분석 차트
 │   ├── settings/    SettingsScreen      ← 프로필 + 설정
 │   └── categories/  CategoryListScreen  ← 설정 탭에서 push 이동
-├── store/           authStore, transactionStore, categoryStore (Zustand)
-├── services/api.ts  # Axios + JWT 인터셉터
-└── types/index.ts   # User, Category, Transaction 인터페이스
+├── store/
+│   ├── authStore.ts            # persist + 오프라인 시 캐시 유저 유지
+│   ├── transactionStore.ts     # persist + 오프라인 낙관적 업데이트
+│   ├── categoryStore.ts        # persist
+│   └── pendingMutationsStore.ts  # 오프라인 FIFO 큐 (MMKV 영속)
+├── storage/index.ts            # MMKV 초기화 + SecureStore 암호화 키 + Zustand adapter
+├── hooks/useNetworkStatus.ts   # NetInfo 래퍼 (isOnline 상태)
+├── services/
+│   ├── api.ts                  # Axios + JWT 인터셉터
+│   └── syncService.ts          # 오프라인 큐 서버 재전송 (re-entrancy guard)
+├── components/OfflineBanner.tsx  # 오프라인/동기화 중 애니메이션 배너
+└── types/index.ts              # User, Category, Transaction, PendingMutation 인터페이스
 ```
 
 ### 네비게이션 구조
@@ -109,6 +126,7 @@ EXPO_PUBLIC_API_URL=http://localhost:8000   # 백엔드 API 베이스 URL
 | 분석 화면 (월별 차트 + 지출 순위) | ✅ 완료 |
 | 설정 화면 (프로필 + 카테고리 관리) | ✅ 완료 |
 | AI 자동 카테고리 분류 (가맹점명 기반) | ✅ 완료 |
+| 오프라인 지원 (MMKV 캐싱 + 낙관적 업데이트 + 펜딩 큐 자동 동기화) | ✅ 완료 |
 | Excel 업로드 자동 파싱 | ⬜ 미구현 |
 | SMS/푸시 실시간 파싱 | ⬜ 미구현 |
 | 카드 실적 트래커 | ⬜ 미구현 |
@@ -126,14 +144,26 @@ cd frontend && npm test          # 전체 테스트 실행
 cd frontend && npm test -- --watchAll=false  # CI 모드
 ```
 
-- **도구**: `jest-expo` (프리셋) + `@types/jest`
+- **도구**: `jest-expo` (프리셋) + `@types/jest` + `@testing-library/react-native`
 - **위치**: `frontend/src/__tests__/` 하위에 미러 구조로 작성
   - `__tests__/store/` — Zustand store 단위 테스트
   - `__tests__/services/` — API 서비스 단위 테스트
+  - `__tests__/storage/` — Storage 추상화 단위 테스트
+  - `__tests__/hooks/` — Custom hook 단위 테스트 (`renderHook` 사용)
 - **원칙**:
   - Store 테스트 시 `apiClient`를 `jest.mock('../../services/api')`로 완전히 모킹
+  - `persist` middleware 사용 store 테스트 시 `createPlatformStorage` 추가 모킹 필수:
+    ```typescript
+    jest.mock('../../storage', () => ({
+      mmkvStorage: { getItem: jest.fn().mockReturnValue(null), setItem: jest.fn(), removeItem: jest.fn() },
+      createPlatformStorage: jest.fn(() => ({
+        getItem: jest.fn().mockReturnValue(null), setItem: jest.fn(), removeItem: jest.fn(),
+      })),
+    }));
+    ```
   - 각 테스트 전 `useXxxStore.setState(초기값)` + `jest.clearAllMocks()`으로 상태 초기화
   - 성공 케이스 + 실패 케이스(에러 전파 / `isLoading` 리셋) 모두 작성
+  - Hook 테스트: `@testing-library/react-native`의 `renderHook` + `act` 사용 (react-hooks 라이브러리 React 19 미지원)
 
 ### Backend (FastAPI / Python)
 
