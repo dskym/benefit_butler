@@ -1,5 +1,5 @@
 // frontend/src/screens/transactions/TransactionListScreen.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import { useCategoryStore } from "../../store/categoryStore";
 import { useCardStore } from "../../store/cardStore";
 import { Transaction } from "../../types";
 import { theme } from "../../theme";
+import { suggestCategory } from "../../utils/categoryKeywords";
 
 // ── 상수 ─────────────────────────────────────────────────
 
@@ -125,6 +126,7 @@ interface FormModalProps {
 function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }: FormModalProps) {
   const { categories } = useCategoryStore();
   const { cards, fetchCards, createCard } = useCardStore();
+  const { transactions } = useTransactionStore();
 
   const defaultType: "income" | "expense" =
     initial?.type === "income" ? "income" : "expense";
@@ -133,6 +135,8 @@ function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }
   const [amount, setAmount] = useState(initial ? String(Math.round(Number(initial.amount))) : "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [categoryId, setCategoryId] = useState(initial?.category_id ?? "");
+  const [suggestedCategoryId, setSuggestedCategoryId] = useState<string | null>(null);
+  const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [datetime, setDatetime] = useState(
     initial
       ? toLocalDateTime(initial.transacted_at)
@@ -154,6 +158,7 @@ function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }
       setAmount(src ? String(Math.round(Number(src.amount))) : "");
       setDescription(src?.description ?? "");
       setCategoryId(src?.category_id ?? "");
+      setSuggestedCategoryId(null);
       // For favorite re-entry (prefill, no initial): reset date to today
       setDatetime(
         initial
@@ -171,12 +176,35 @@ function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }
   const handleTypeChange = (newType: "income" | "expense") => {
     setType(newType);
     setCategoryId("");
+    setSuggestedCategoryId(null);
     // 수입으로 바꾸면 결제 수단 초기화
     if (newType === "income") {
       setPaymentType(null);
       setSelectedCardId(null);
       setShowAddCard(false);
     }
+  };
+
+  const handleDescriptionChange = (text: string) => {
+    setDescription(text);
+    if (suggestTimer.current) clearTimeout(suggestTimer.current);
+    if (text.length < 2) {
+      setSuggestedCategoryId(null);
+      return;
+    }
+    suggestTimer.current = setTimeout(() => {
+      const suggestion = suggestCategory(text, type, transactions, categories);
+      setSuggestedCategoryId(suggestion?.categoryId ?? null);
+      if (suggestion) {
+        // 카테고리 미선택 상태에서만 자동 선택
+        setCategoryId((prev) => prev || suggestion.categoryId);
+      }
+    }, 150);
+  };
+
+  const handleCategorySelect = (catId: string) => {
+    setCategoryId(catId);
+    setSuggestedCategoryId(null);
   };
 
   const handlePaymentTypeChange = (pt: string) => {
@@ -279,6 +307,80 @@ function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }
               ))}
             </View>
 
+            <Text style={styles.label}>금액 (원)</Text>
+            <TextInput
+              style={styles.input}
+              value={amount}
+              onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ""))}
+              placeholder="예: 15000"
+              placeholderTextColor={theme.colors.text.hint}
+              keyboardType="numeric"
+            />
+
+            <Text style={styles.label}>메모 (가맹점명)</Text>
+            <TextInput
+              style={styles.input}
+              value={description}
+              onChangeText={handleDescriptionChange}
+              placeholder="가맹점명 입력 시 카테고리 자동 추천"
+              placeholderTextColor={theme.colors.text.hint}
+            />
+
+            <Text style={styles.label}>카테고리 (선택)</Text>
+            {!suggestedCategoryId && !categoryId && (
+              <Text style={styles.categoryHint}>메모를 입력하면 카테고리를 자동 추천합니다</Text>
+            )}
+            <View style={styles.categoryList}>
+              <TouchableOpacity
+                style={[styles.categoryChip, !categoryId && styles.categoryChipSelected]}
+                onPress={() => handleCategorySelect("")}
+              >
+                <Text style={[styles.categoryChipText, !categoryId && styles.categoryChipSelectedText]}>
+                  없음
+                </Text>
+              </TouchableOpacity>
+              {filteredCategories.map((c) => {
+                const isSuggested = c.id === suggestedCategoryId;
+                const isSelected = categoryId === c.id;
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[
+                      styles.categoryChip,
+                      isSelected && styles.categoryChipSelected,
+                      isSelected && { borderColor: c.color ?? theme.colors.primary },
+                    ]}
+                    onPress={() => handleCategorySelect(c.id)}
+                  >
+                    {c.color && (
+                      <View style={[styles.categoryChipDot, { backgroundColor: c.color }]} />
+                    )}
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        isSelected && styles.categoryChipSelectedText,
+                      ]}
+                    >
+                      {c.name}
+                    </Text>
+                    {isSelected && isSuggested && (
+                      <View style={styles.suggestBadge}>
+                        <Text style={styles.suggestBadgeText}>추천</Text>
+                      </View>
+                    )}
+                    {!isSelected && isSuggested && (
+                      <Text style={styles.suggestHintText}>💡</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+              {filteredCategories.length === 0 && (
+                <Text style={styles.noCategoryText}>
+                  {type === "income" ? "수입" : "지출"} 카테고리가 없습니다.
+                </Text>
+              )}
+            </View>
+
             {/* 결제 수단 — 지출일 때만 표시 */}
             {type === "expense" && (
               <>
@@ -349,65 +451,6 @@ function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }
                 )}
               </>
             )}
-
-            <Text style={styles.label}>카테고리 (선택)</Text>
-            <View style={styles.categoryList}>
-              <TouchableOpacity
-                style={[styles.categoryChip, !categoryId && styles.categoryChipSelected]}
-                onPress={() => setCategoryId("")}
-              >
-                <Text style={[styles.categoryChipText, !categoryId && styles.categoryChipSelectedText]}>
-                  없음
-                </Text>
-              </TouchableOpacity>
-              {filteredCategories.map((c) => (
-                <TouchableOpacity
-                  key={c.id}
-                  style={[
-                    styles.categoryChip,
-                    categoryId === c.id && styles.categoryChipSelected,
-                    categoryId === c.id && { borderColor: c.color ?? theme.colors.primary },
-                  ]}
-                  onPress={() => setCategoryId(c.id)}
-                >
-                  {c.color && (
-                    <View style={[styles.categoryChipDot, { backgroundColor: c.color }]} />
-                  )}
-                  <Text
-                    style={[
-                      styles.categoryChipText,
-                      categoryId === c.id && styles.categoryChipSelectedText,
-                    ]}
-                  >
-                    {c.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              {filteredCategories.length === 0 && (
-                <Text style={styles.noCategoryText}>
-                  {type === "income" ? "수입" : "지출"} 카테고리가 없습니다.
-                </Text>
-              )}
-            </View>
-
-            <Text style={styles.label}>금액 (원)</Text>
-            <TextInput
-              style={styles.input}
-              value={amount}
-              onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ""))}
-              placeholder="예: 15000"
-              placeholderTextColor={theme.colors.text.hint}
-              keyboardType="numeric"
-            />
-
-            <Text style={styles.label}>메모 (선택)</Text>
-            <TextInput
-              style={styles.input}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="예: 점심 식사"
-              placeholderTextColor={theme.colors.text.hint}
-            />
 
             <View style={styles.sheetActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
@@ -1133,6 +1176,21 @@ const styles = StyleSheet.create({
   categoryChipText: { fontSize: 13, color: theme.colors.text.secondary },
   categoryChipSelectedText: { color: theme.colors.primary, fontWeight: "600" },
   noCategoryText: { fontSize: 13, color: theme.colors.text.hint },
+  categoryHint: {
+    fontSize: 12,
+    color: theme.colors.text.hint,
+    fontStyle: "italic",
+    marginBottom: 4,
+  },
+  suggestBadge: {
+    marginLeft: 4,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  suggestBadgeText: { fontSize: 10, color: "#fff", fontWeight: "700" },
+  suggestHintText: { fontSize: 12, marginLeft: 2 },
 
   // Payment method
   paymentRow: { flexDirection: "row", gap: 6, marginTop: 4 },
