@@ -1,6 +1,7 @@
 // frontend/src/navigation/index.tsx
 import React, { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -112,6 +113,7 @@ function MainNavigator() {
 export default function RootNavigation() {
   useSmsAutoImport();    // Android 전용, 내부 Platform 가드 있음
   usePushAutoImport();   // Android 전용, 내부 Platform 가드 있음
+  const insets = useSafeAreaInsets();
   const { user, isLoading } = useAuthStore();
   const fetchMe = useAuthStore((s) => s.fetchMe);
   const { isOnline } = useNetworkStatus();
@@ -131,7 +133,7 @@ export default function RootNavigation() {
   );
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, paddingTop: insets.top }}>
       <NavigationContainer>
         {user !== null ? <MainNavigator /> : <AuthNavigator />}
       </NavigationContainer>

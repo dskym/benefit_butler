@@ -38,6 +38,12 @@ describe('useNetworkStatus', () => {
     expect(result.current.isOnline).toBe(true);
   });
 
+  it('treats isConnected: null as online (Android 전환 상태 대응)', () => {
+    const { result } = renderHook(() => useNetworkStatus());
+    act(() => { capturedListener?.({ isConnected: null, isInternetReachable: null }); });
+    expect(result.current.isOnline).toBe(true);
+  });
+
   it('unsubscribes on unmount', () => {
     const mockUnsub = jest.fn();
     (NetInfo.addEventListener as jest.Mock).mockReturnValue(mockUnsub);
