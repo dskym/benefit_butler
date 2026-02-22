@@ -16,6 +16,7 @@ jest.mock("expo-secure-store", () => ({
 // Force the native code path so tokenStorage uses SecureStore, not localStorage.
 jest.mock("react-native", () => ({
   Platform: { OS: "ios" },
+  NativeModules: {},      // getApiBaseUrl()에서 SourceCode 자동감지 비활성화
 }));
 
 beforeEach(() => {

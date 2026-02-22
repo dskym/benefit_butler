@@ -1,11 +1,32 @@
 // frontend/src/services/api.ts
 import axios from "axios";
-import { Platform } from "react-native";
+import { Platform, NativeModules } from "react-native";
 import * as SecureStore from "expo-secure-store";
 
-// iOS Simulator는 localhost 가능, Android 에뮬레이터는 10.0.2.2, 실기기는 실제 IP 필요
-// .env.local 파일에 EXPO_PUBLIC_API_URL 설정 (예: http://192.168.x.x:8000/api/v1)
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+// 우선순위: EXPO_PUBLIC_API_URL > Metro 호스트 자동감지 > localhost 폴백
+// - EXPO_PUBLIC_API_URL: 명시적 설정 (프로덕션 빌드, 커스텀 서버)
+// - Metro 자동감지: 개발 중 실기기/에뮬레이터에서 설정 없이 자동 연결
+//   (같은 WiFi 네트워크에서 Metro 번들러 IP를 재사용)
+// - localhost: iOS 시뮬레이터 / 웹 폴백
+function getApiBaseUrl(): string {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  // __DEV__ + 네이티브: Metro scriptURL에서 호스트 IP 추출
+  if (typeof __DEV__ !== "undefined" && __DEV__ && Platform.OS !== "web") {
+    // NativeModules.SourceCode 는 테스트 환경에서 undefined일 수 있으므로 안전하게 접근
+    const scriptURL: string | undefined =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (NativeModules as any)?.SourceCode?.scriptURL;
+    if (scriptURL) {
+      const match = scriptURL.match(/^https?:\/\/([^:/]+)/);
+      if (match?.[1]) return `http://${match[1]}:8000/api/v1`;
+    }
+  }
+  return "http://localhost:8000/api/v1";
+}
+
+const BASE_URL = getApiBaseUrl();
 const TOKEN_KEY = "access_token";
 
 // expo-secure-store는 웹에서 빈 객체를 반환해 모든 메서드가 undefined임.
@@ -33,7 +54,7 @@ const tokenStorage = {
   },
 };
 
-export const apiClient = axios.create({ baseURL: BASE_URL });
+export const apiClient = axios.create({ baseURL: BASE_URL, timeout: 10000 });
 
 // Request interceptor: JWT 자동 첨부
 apiClient.interceptors.request.use(async (config) => {
