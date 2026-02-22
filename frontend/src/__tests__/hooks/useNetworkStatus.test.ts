@@ -3,6 +3,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 
 jest.mock('@react-native-community/netinfo', () => ({
+  configure: jest.fn(),
   fetch: jest.fn(),
   addEventListener: jest.fn(),
 }));
@@ -42,6 +43,18 @@ describe('useNetworkStatus', () => {
     const { result } = renderHook(() => useNetworkStatus());
     act(() => { capturedListener?.({ isConnected: null, isInternetReachable: null }); });
     expect(result.current.isOnline).toBe(true);
+  });
+
+  it('isInternetReachable: true가 isConnected: false보다 우선한다 (Galaxy NET_CAPABILITY_VALIDATED 오보 대응)', () => {
+    const { result } = renderHook(() => useNetworkStatus());
+    act(() => { capturedListener?.({ isConnected: false, isInternetReachable: true }); });
+    expect(result.current.isOnline).toBe(true);
+  });
+
+  it('isInternetReachable: false가 isConnected: true보다 우선한다', () => {
+    const { result } = renderHook(() => useNetworkStatus());
+    act(() => { capturedListener?.({ isConnected: true, isInternetReachable: false }); });
+    expect(result.current.isOnline).toBe(false);
   });
 
   it('unsubscribes on unmount', () => {

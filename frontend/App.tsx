@@ -36,6 +36,14 @@ export default function App() {
     initStorage().then(() => setStorageReady(true));
   }, []);
 
+  // 앱 시작 시 온라인이면 이전 세션의 pending mutations를 즉시 flush
+  useEffect(() => {
+    if (storageReady && isOnline) {
+      syncService.flush();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageReady]);
+
   useEffect(() => {
     if (prevOnlineRef.current === false && isOnline) {
       syncService.flush();

@@ -38,6 +38,7 @@ jest.mock('../../store/transactionStore', () => ({
 }));
 
 jest.mock('@react-native-community/netinfo', () => ({
+  configure: jest.fn(),
   fetch: jest.fn().mockResolvedValue({ isConnected: true, isInternetReachable: true }),
   addEventListener: jest.fn().mockReturnValue(jest.fn()),
 }));
