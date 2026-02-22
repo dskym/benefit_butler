@@ -1,5 +1,15 @@
 // src/__tests__/store/transactionStore.test.ts
 
+jest.mock('../../storage', () => ({
+  mmkvStorage: { getItem: jest.fn().mockReturnValue(null), setItem: jest.fn(), removeItem: jest.fn() },
+  createPlatformStorage: jest.fn(() => ({
+    getItem: jest.fn().mockReturnValue(null),
+    setItem: jest.fn(),
+    removeItem: jest.fn(),
+  })),
+}));
+jest.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+
 import { useTransactionStore } from "../../store/transactionStore";
 import { apiClient } from "../../services/api";
 
@@ -229,5 +239,25 @@ describe("toggleFavorite", () => {
       useTransactionStore.getState().transactions.find((t) => t.id === "t2")
         ?.is_favorite
     ).toBe(false);
+  });
+});
+
+// ─── replaceLocalTransaction ──────────────────────────────────────────────────
+
+describe("replaceLocalTransaction", () => {
+  it("replaces temp-id transaction with server version", () => {
+    const mockTx = makeTransaction("local-uuid", 5000);
+    useTransactionStore.setState({ transactions: [{ ...mockTx, _isPending: true }] });
+    useTransactionStore.getState().replaceLocalTransaction("local-uuid", { ...mockTx, id: "server-id" });
+    expect(useTransactionStore.getState().transactions[0].id).toBe("server-id");
+  });
+
+  it("does not affect other transactions", () => {
+    const mockTx = makeTransaction("local-uuid", 5000);
+    useTransactionStore.setState({
+      transactions: [makeTransaction("other", 9000), { ...mockTx, _isPending: true }],
+    });
+    useTransactionStore.getState().replaceLocalTransaction("local-uuid", { ...mockTx, id: "srv" });
+    expect(useTransactionStore.getState().transactions.find((t) => t.id === "other")).toBeDefined();
   });
 });

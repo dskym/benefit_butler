@@ -1,5 +1,15 @@
 // src/__tests__/store/authStore.test.ts
 
+jest.mock('../../storage', () => ({
+  mmkvStorage: { getItem: jest.fn().mockReturnValue(null), setItem: jest.fn(), removeItem: jest.fn() },
+  createPlatformStorage: jest.fn(() => ({
+    getItem: jest.fn().mockReturnValue(null),
+    setItem: jest.fn(),
+    removeItem: jest.fn(),
+  })),
+}));
+jest.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+
 import { useAuthStore } from "../../store/authStore";
 import { apiClient, saveToken, clearToken } from "../../services/api";
 
@@ -120,13 +130,35 @@ describe("fetchMe", () => {
     expect(useAuthStore.getState().isLoading).toBe(false);
   });
 
-  it("clears token and sets user to null on any error", async () => {
-    (apiClient.get as jest.Mock).mockRejectedValue(new Error("Unauthorized"));
+  it("clears token and sets user to null on 401 error", async () => {
+    (apiClient.get as jest.Mock).mockRejectedValue({ response: { status: 401 } });
 
     await useAuthStore.getState().fetchMe();
 
     expect(clearToken).toHaveBeenCalled();
     expect(useAuthStore.getState().user).toBeNull();
     expect(useAuthStore.getState().isLoading).toBe(false);
+  });
+});
+
+// ─── fetchMe offline behavior ─────────────────────────────────────────────────
+
+describe("fetchMe offline behavior", () => {
+  it("preserves cached user on network error", async () => {
+    useAuthStore.setState({ user: mockUser });
+    (apiClient.get as jest.Mock).mockRejectedValue(new Error("Network Error"));
+
+    await useAuthStore.getState().fetchMe();
+
+    expect(useAuthStore.getState().user).toEqual(mockUser);
+  });
+
+  it("clears user on 401", async () => {
+    useAuthStore.setState({ user: mockUser });
+    (apiClient.get as jest.Mock).mockRejectedValue({ response: { status: 401 } });
+
+    await useAuthStore.getState().fetchMe();
+
+    expect(useAuthStore.getState().user).toBeNull();
   });
 });

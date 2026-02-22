@@ -1,7 +1,9 @@
 // frontend/src/store/categoryStore.ts
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { Category } from "../types";
 import { apiClient } from "../services/api";
+import { createPlatformStorage } from "../storage";
 
 interface CategoryCreate {
   name: string;
@@ -24,34 +26,39 @@ interface CategoryState {
   deleteCategory: (id: string) => Promise<void>;
 }
 
-export const useCategoryStore = create<CategoryState>((set) => ({
-  categories: [],
-  isLoading: false,
+export const useCategoryStore = create<CategoryState>()(
+  persist(
+    (set) => ({
+      categories: [],
+      isLoading: false,
 
-  fetchCategories: async () => {
-    set({ isLoading: true });
-    try {
-      const { data } = await apiClient.get("/categories/");
-      set({ categories: data });
-    } finally {
-      set({ isLoading: false });
-    }
-  },
+      fetchCategories: async () => {
+        set({ isLoading: true });
+        try {
+          const { data } = await apiClient.get("/categories/");
+          set({ categories: data });
+        } finally {
+          set({ isLoading: false });
+        }
+      },
 
-  createCategory: async (payload) => {
-    const { data } = await apiClient.post("/categories/", payload);
-    set((s) => ({ categories: [data, ...s.categories] }));
-  },
+      createCategory: async (payload) => {
+        const { data } = await apiClient.post("/categories/", payload);
+        set((s) => ({ categories: [data, ...s.categories] }));
+      },
 
-  updateCategory: async (id, payload) => {
-    const { data } = await apiClient.put(`/categories/${id}`, payload);
-    set((s) => ({
-      categories: s.categories.map((c) => (c.id === id ? data : c)),
-    }));
-  },
+      updateCategory: async (id, payload) => {
+        const { data } = await apiClient.put(`/categories/${id}`, payload);
+        set((s) => ({
+          categories: s.categories.map((c) => (c.id === id ? data : c)),
+        }));
+      },
 
-  deleteCategory: async (id) => {
-    await apiClient.delete(`/categories/${id}`);
-    set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
-  },
-}));
+      deleteCategory: async (id) => {
+        await apiClient.delete(`/categories/${id}`);
+        set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
+      },
+    }),
+    { name: "categories", storage: createPlatformStorage() },
+  ),
+);

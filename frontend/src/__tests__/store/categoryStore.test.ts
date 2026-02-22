@@ -1,5 +1,15 @@
 // src/__tests__/store/categoryStore.test.ts
 
+jest.mock('../../storage', () => ({
+  mmkvStorage: { getItem: jest.fn().mockReturnValue(null), setItem: jest.fn(), removeItem: jest.fn() },
+  createPlatformStorage: jest.fn(() => ({
+    getItem: jest.fn().mockReturnValue(null),
+    setItem: jest.fn(),
+    removeItem: jest.fn(),
+  })),
+}));
+jest.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+
 import { useCategoryStore } from "../../store/categoryStore";
 import { apiClient } from "../../services/api";
 
