@@ -8,6 +8,7 @@ export interface MMKVLike {
 }
 
 let _mmkv: MMKVLike | null = null;
+let _useAsyncFallback = false;
 let _resolveReady: () => void;
 
 export const storageReady: Promise<void> = new Promise((resolve) => {
@@ -40,22 +41,40 @@ export async function initStorage(): Promise<void> {
     }
     _mmkv = new MMKV({ id: 'benefit-butler', encryptionKey: encKey });
   } catch (err) {
-    console.warn('[storage] MMKV init failed, using in-memory fallback', err);
-    const store = new Map<string, string>();
-    _mmkv = {
-      getString: (k) => store.get(k),
-      set: (k, v) => store.set(k, v),
-      delete: (k) => store.delete(k),
-    };
+    console.warn('[storage] MMKV init failed, using AsyncStorage fallback', err);
+    _useAsyncFallback = true;
   } finally {
     _resolveReady();
   }
 }
 
 export const mmkvStorage: StateStorage = {
-  getItem: (key) => _mmkv?.getString(key) ?? null,
-  setItem: (key, value) => _mmkv?.set(key, value),
-  removeItem: (key) => _mmkv?.delete(key),
+  getItem: (key) => {
+    if (_useAsyncFallback) {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      return AsyncStorage.getItem(key) as Promise<string | null>;
+    }
+    return _mmkv?.getString(key) ?? null;
+  },
+  setItem: (key, value) => {
+    if (_useAsyncFallback) {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      AsyncStorage.setItem(key, value);
+      return;
+    }
+    _mmkv?.set(key, value);
+  },
+  removeItem: (key) => {
+    if (_useAsyncFallback) {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      AsyncStorage.removeItem(key);
+      return;
+    }
+    _mmkv?.delete(key);
+  },
 };
 
 // Zustand persist storage factory — web: AsyncStorage, native: MMKV

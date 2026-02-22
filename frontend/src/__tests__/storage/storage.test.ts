@@ -67,3 +67,4 @@ describe('mmkvStorage adapter', () => {
     expect(mock.delete).toHaveBeenCalledWith('foo');
   });
 });
+
