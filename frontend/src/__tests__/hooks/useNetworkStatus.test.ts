@@ -3,7 +3,6 @@ import NetInfo from '@react-native-community/netinfo';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 
 jest.mock('@react-native-community/netinfo', () => ({
-  configure: jest.fn(),
   fetch: jest.fn(),
   addEventListener: jest.fn(),
 }));
@@ -13,7 +12,7 @@ let capturedListener: ((s: any) => void) | null = null;
 beforeEach(() => {
   capturedListener = null;
   jest.clearAllMocks();
-  (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: true, isInternetReachable: true });
+  (NetInfo.fetch as jest.Mock).mockResolvedValue({ type: 'wifi', isConnected: true, isInternetReachable: true });
   (NetInfo.addEventListener as jest.Mock).mockImplementation((cb) => {
     capturedListener = cb;
     return jest.fn();
@@ -26,35 +25,41 @@ describe('useNetworkStatus', () => {
     expect(result.current.isOnline).toBe(true);
   });
 
-  it('isInternetReachable: false이면 오프라인', () => {
+  it('type: none이면 오프라인', () => {
     const { result } = renderHook(() => useNetworkStatus());
-    act(() => { capturedListener?.({ isConnected: false, isInternetReachable: false }); });
+    act(() => { capturedListener?.({ type: 'none', isConnected: false, isInternetReachable: false }); });
     expect(result.current.isOnline).toBe(false);
   });
 
-  it('isInternetReachable: true이면 온라인 (isConnected 무관)', () => {
+  it('type: wifi이면 온라인 (isConnected 무관)', () => {
     const { result } = renderHook(() => useNetworkStatus());
-    act(() => { capturedListener?.({ isConnected: false, isInternetReachable: true }); });
+    act(() => { capturedListener?.({ type: 'wifi', isConnected: false, isInternetReachable: null }); });
     expect(result.current.isOnline).toBe(true);
   });
 
-  it('isInternetReachable: null이면 온라인 (HTTP 검사 대기 중, 낙관적 처리)', () => {
+  it('type: cellular이면 온라인', () => {
     const { result } = renderHook(() => useNetworkStatus());
-    act(() => { capturedListener?.({ isConnected: false, isInternetReachable: null }); });
+    act(() => { capturedListener?.({ type: 'cellular', isConnected: true, isInternetReachable: true }); });
     expect(result.current.isOnline).toBe(true);
   });
 
-  it('isConnected: null, isInternetReachable: null이면 온라인 (낙관적)', () => {
+  it('type: unknown이면 온라인 (낙관적)', () => {
     const { result } = renderHook(() => useNetworkStatus());
-    act(() => { capturedListener?.({ isConnected: null, isInternetReachable: null }); });
+    act(() => { capturedListener?.({ type: 'unknown', isConnected: null, isInternetReachable: null }); });
+    expect(result.current.isOnline).toBe(true);
+  });
+
+  it('Samsung Galaxy처럼 isConnected:false여도 type:wifi면 온라인', () => {
+    const { result } = renderHook(() => useNetworkStatus());
+    act(() => { capturedListener?.({ type: 'wifi', isConnected: false, isInternetReachable: false }); });
     expect(result.current.isOnline).toBe(true);
   });
 
   it('재연결 시 온라인으로 복귀', () => {
     const { result } = renderHook(() => useNetworkStatus());
-    act(() => { capturedListener?.({ isConnected: false, isInternetReachable: false }); });
+    act(() => { capturedListener?.({ type: 'none', isConnected: false, isInternetReachable: false }); });
     expect(result.current.isOnline).toBe(false);
-    act(() => { capturedListener?.({ isConnected: true, isInternetReachable: true }); });
+    act(() => { capturedListener?.({ type: 'wifi', isConnected: true, isInternetReachable: true }); });
     expect(result.current.isOnline).toBe(true);
   });
 
