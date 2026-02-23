@@ -8,6 +8,8 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import { OfflineBanner } from "../components/OfflineBanner";
+import { useSyncStatusStore } from "../store/syncStatusStore";
+import { usePendingMutationsStore } from "../store/pendingMutationsStore";
 import { useSmsAutoImport } from "../hooks/useSmsAutoImport";
 import { usePushAutoImport } from "../hooks/usePushAutoImport";
 
@@ -117,6 +119,8 @@ export default function RootNavigation() {
   const { user, isLoading } = useAuthStore();
   const fetchMe = useAuthStore((s) => s.fetchMe);
   const { isOnline } = useNetworkStatus();
+  const isSyncing = useSyncStatusStore((s) => s.isSyncing);
+  const pendingCount = usePendingMutationsStore((s) => s.queue.length);
 
   useEffect(() => {
     if (isOnline) {
@@ -137,7 +141,7 @@ export default function RootNavigation() {
       <NavigationContainer>
         {user !== null ? <MainNavigator /> : <AuthNavigator />}
       </NavigationContainer>
-      <OfflineBanner isOnline={isOnline} />
+      <OfflineBanner isOnline={isOnline} isSyncing={isSyncing} pendingCount={pendingCount} />
     </View>
   );
 }
