@@ -16,8 +16,10 @@
   - Charts: `react-native-gifted-charts` + `react-native-svg`
   - Icons: `@expo/vector-icons` (Ionicons)
   - Auth Storage: `expo-secure-store` (native) / `localStorage` (web)
-  - Offline Storage: `react-native-mmkv` (AES 암호화, native only) / `@react-native-async-storage/async-storage` (web fallback)
+  - Offline Storage: `react-native-mmkv` (AES 암호화, native only) / `@react-native-async-storage/async-storage` (web fallback + Push 임포트 IPC)
   - Network: `@react-native-community/netinfo` (연결 상태 감지)
+  - SMS Import (Android): `react-native-get-sms-android` (CommonJS 직접 export — `.default` 없이 사용)
+  - Push Import (Android): `react-native-notification-listener` (Headless JS 방식 — `addListener` 아님)
 - **Backend**: Python (FastAPI)
 - **Database**: PostgreSQL (회원 정보, 결제 내역, 카드 메타데이터 관리)
 - **Auth**: JWT 기반 인증 (OAuth2.0 카카오/구글 소셜 로그인 권장)
@@ -55,13 +57,16 @@
 ```bash
 cd frontend && npx expo start --web   # 웹 개발
 cd frontend && npx expo start         # 네이티브 (Expo Go)
+cd frontend && npm run android        # Android dev build (expo run:android)
+cd frontend && npm run ios            # iOS dev build (expo run:ios)
 ```
 
-> ⚠️ **MMKV 주의**: `react-native-mmkv`는 native module이므로 Expo Go에서 동작하지 않음.
-> 네이티브 개발 시 반드시 개발 빌드 사용:
+> ⚠️ **Native Module 주의**: `react-native-mmkv`, `react-native-get-sms-android`, `react-native-notification-listener`는 모두 native module이므로 Expo Go에서 동작하지 않음.
+> SMS/푸시 자동 임포트 포함 네이티브 개발 시 반드시 개발 빌드 사용:
 > ```bash
-> cd frontend && npx expo prebuild --clean && npx expo run:ios
+> cd frontend && npx expo prebuild --platform android --clean && npx expo run:android
 > ```
+> Android SDK 경로 설정 필요 시: `frontend/android/local.properties`에 `sdk.dir=/Users/<username>/Library/Android/sdk` 추가
 
 ### 파일 구조
 ```
@@ -76,18 +81,26 @@ frontend/src/
 │   ├── settings/    SettingsScreen      ← 프로필 + 설정
 │   └── categories/  CategoryListScreen  ← 설정 탭에서 push 이동
 ├── store/
-│   ├── authStore.ts            # persist + 오프라인 시 캐시 유저 유지
-│   ├── transactionStore.ts     # persist + 오프라인 낙관적 업데이트 (toggleFavorite 포함)
-│   ├── categoryStore.ts        # persist
+│   ├── authStore.ts              # persist + 오프라인 시 캐시 유저 유지
+│   ├── transactionStore.ts       # persist + 오프라인 낙관적 업데이트 (toggleFavorite 포함)
+│   ├── categoryStore.ts          # persist
+│   ├── financialImportStore.ts   # SMS/푸시 임포트 상태 (isSmsEnabled, isPushEnabled, dedup, persist)
 │   ├── pendingMutationsStore.ts  # 오프라인 FIFO 큐 (MMKV 영속) + retryCount + incrementRetry
-│   └── syncStatusStore.ts      # 동기화 상태 (isSyncing, lastSyncAt persist, syncError)
-├── storage/index.ts            # MMKV 초기화 + SecureStore 암호화 키 + Zustand adapter
-├── hooks/useNetworkStatus.ts   # NetInfo 래퍼 (isOnline 상태)
+│   └── syncStatusStore.ts        # 동기화 상태 (isSyncing, lastSyncAt persist, syncError)
+├── storage/index.ts              # MMKV 초기화 + SecureStore 암호화 키 + Zustand adapter
+├── hooks/
+│   ├── useNetworkStatus.ts       # NetInfo 래퍼 (isOnline 상태)
+│   ├── useSmsAutoImport.android.ts   # Android SMS 읽기 → 파싱 → 거래 생성
+│   └── usePushAutoImport.android.ts  # Android AsyncStorage pending 항목 처리 → 거래 생성
 ├── services/
-│   ├── api.ts                  # Axios + JWT 인터셉터
-│   └── syncService.ts          # 오프라인 큐 재전송: 재시도 전략 + syncStatusStore 연동
+│   ├── api.ts                    # Axios + JWT 인터셉터
+│   ├── syncService.ts            # 오프라인 큐 재전송: 재시도 전략 + syncStatusStore 연동
+│   └── headlessNotificationHandler.ts  # Android Headless JS: 알림 파싱 → AsyncStorage 저장
+├── utils/
+│   ├── smsParser.ts              # parseFinancialMessage() + buildDedupKey() — SMS/푸시 공용
+│   └── financialAppPackages.ts   # 금융앱 패키지명 화이트리스트
 ├── components/OfflineBanner.tsx  # 오프라인(주황)/동기화 중(파랑) 두 상태 구분 배너
-└── types/index.ts              # User, Category, Transaction, PendingMutation 인터페이스
+└── types/index.ts                # User, Category, Transaction, PendingMutation 인터페이스
 ```
 
 ### 네비게이션 구조
@@ -128,6 +141,33 @@ RootNavigation
 - 온라인 성공: `_isPending: false`
 - 온라인 실패: `is_favorite` 원복 + throw
 
+### SMS/푸시 자동 임포트 아키텍처 (Android)
+
+#### SMS 임포트 흐름
+1. `useSmsAutoImport` (마운트 시, `isSmsEnabled` 변경 시 실행)
+2. `PermissionsAndroid.request(READ_SMS)` 권한 요청
+3. `react-native-get-sms-android` — SMS inbox 읽기 (`minDate` 기준)
+4. `parseFinancialMessage()` — 금융 SMS 파싱
+5. dedup 체크 (`importedSmsIds` + `dedupSignatures`) 후 `createTransaction()`
+6. `financialImportStore`에 처리된 ID·dedup 서명 저장
+
+#### 푸시 임포트 흐름 (Headless JS 방식)
+1. **백그라운드**: Android가 알림 수신 시 `RNAndroidNotificationListenerHeadlessJs` Headless task 실행
+2. `headlessNotificationHandler` — `FINANCIAL_APP_PACKAGES` 필터 → `parseFinancialMessage()` → AsyncStorage(`@benefit_butler/pending_push`)에 저장
+3. **포그라운드**: `usePushAutoImport`가 마운트 시 + `AppState active` 이벤트 시 AsyncStorage에서 pending 항목 처리 → `createTransaction()`
+4. 처리된 항목은 AsyncStorage에서 제거, dedup 서명 저장
+
+#### dedup 키 형식
+```
+`${amount}:${description}:${Math.floor(tsMs / 300000)}`
+```
+5분 버킷 단위로 동일 거래를 SMS/푸시 중복 없이 1번만 생성.
+
+#### 주요 주의사항
+- `react-native-notification-listener`의 실제 API: `getPermissionStatus()` / `requestPermission()` (`.isPermitted()` / `.addListener()` 아님)
+- `react-native-get-sms-android`는 CommonJS export — `require()` 직접 사용, `.default` 없음
+- Android 10+ `adb shell content insert`로 SMS inbox 직접 삽입 불가 (권한 차단)
+
 ### 디자인 시스템
 - **Primary**: `#3182F6` (토스 블루)
 - **Income**: `#22C55E` / **Expense**: `#F04452` / **Transfer**: `#8B95A1`
@@ -153,7 +193,7 @@ EXPO_PUBLIC_API_URL=http://localhost:8000   # 백엔드 API 베이스 URL
 | 오프라인 지원 (MMKV 캐싱 + 낙관적 업데이트 + 펜딩 큐 자동 동기화) | ✅ 완료 |
 | 오프라인 퍼스트 완성 (재시도 전략 + toggleFavorite 오프라인 + 동기화 상태 UI + 카테고리 가드) | ✅ 완료 |
 | Excel 업로드 자동 파싱 | ⬜ 미구현 |
-| SMS/푸시 실시간 파싱 | ⬜ 미구현 |
+| SMS/푸시 실시간 파싱 (Android) | ✅ 완료 |
 | 카드 실적 트래커 | ⬜ 미구현 |
 | 카드 추천 알고리즘 | ⬜ 미구현 |
 | 소셜 로그인 (카카오/구글) | ⬜ 미구현 |
@@ -198,6 +238,25 @@ cd frontend && npm test -- --watchAll=false  # CI 모드
     }));
     ```
   - `syncService` 테스트 시 `usePendingMutationsStore`, `useTransactionStore`, `useSyncStatusStore` 모두 모킹 필수. `syncService['_isFlushing'] = false`로 re-entrancy 초기화
+  - `usePushAutoImport` 등 AsyncStorage 사용 hook 테스트 시 `@react-native-async-storage/async-storage` 모킹 필수:
+    ```typescript
+    jest.mock('@react-native-async-storage/async-storage', () => ({
+      getItem: jest.fn().mockResolvedValue(null),
+      setItem: jest.fn().mockResolvedValue(undefined),
+      removeItem: jest.fn().mockResolvedValue(undefined),
+    }));
+    ```
+  - `react-native-notification-listener`는 CommonJS export (no `__esModule`/`default`):
+    ```typescript
+    jest.mock('react-native-notification-listener', () => ({
+      getPermissionStatus: jest.fn().mockResolvedValue('authorized'),
+      requestPermission: jest.fn(),
+    }));
+    ```
+  - `react-native-get-sms-android`도 CommonJS export — mock 시 `default` 래퍼 불필요:
+    ```typescript
+    jest.mock('react-native-get-sms-android', () => ({ list: jest.fn() }));
+    ```
 
 ### Backend (FastAPI / Python)
 
