@@ -13,7 +13,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.frontend"
     },
     "android": {
       "adaptiveIcon": {
@@ -26,7 +27,8 @@
       "permissions": [
         "android.permission.READ_SMS",
         "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-      ]
+      ],
+      "package": "com.anonymous.frontend"
     },
     "web": {
       "favicon": "./assets/favicon.png"
