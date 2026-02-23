@@ -251,6 +251,52 @@ describe("toggleFavorite", () => {
   });
 });
 
+// ─── toggleFavorite (offline) ────────────────────────────────────────────────
+
+describe("toggleFavorite (offline)", () => {
+  it("오프라인: 낙관적 업데이트 + 큐 enqueue", async () => {
+    useTransactionStore.setState({
+      transactions: [{ ...makeTransaction("tx-1", 5000), _isPending: false }],
+      isLoading: false,
+    });
+    await useTransactionStore.getState().toggleFavorite("tx-1", true, false);
+    const tx = useTransactionStore.getState().transactions.find((t) => t.id === "tx-1");
+    expect(tx?.is_favorite).toBe(true);
+    expect(tx?._isPending).toBe(true);
+    const mockEnqueue = usePendingMutationsStore.getState().enqueue as jest.Mock;
+    expect(mockEnqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "TOGGLE_FAVORITE" }),
+    );
+    expect(apiClient.patch).not.toHaveBeenCalled();
+  });
+
+  it("온라인: API 호출 + _isPending 해제", async () => {
+    useTransactionStore.setState({
+      transactions: [{ ...makeTransaction("tx-1", 5000), _isPending: false }],
+      isLoading: false,
+    });
+    (apiClient.patch as jest.Mock).mockResolvedValue({});
+    await useTransactionStore.getState().toggleFavorite("tx-1", true, true);
+    const tx = useTransactionStore.getState().transactions.find((t) => t.id === "tx-1");
+    expect(tx?.is_favorite).toBe(true);
+    expect(tx?._isPending).toBe(false);
+    expect(apiClient.patch).toHaveBeenCalledWith("/transactions/tx-1/favorite", { is_favorite: true });
+  });
+
+  it("온라인 API 실패 시 롤백", async () => {
+    useTransactionStore.setState({
+      transactions: [{ ...makeTransaction("tx-1", 5000, false), _isPending: false }],
+      isLoading: false,
+    });
+    (apiClient.patch as jest.Mock).mockRejectedValue(new Error("서버 오류"));
+    await expect(
+      useTransactionStore.getState().toggleFavorite("tx-1", true, true),
+    ).rejects.toThrow();
+    const tx = useTransactionStore.getState().transactions.find((t) => t.id === "tx-1");
+    expect(tx?.is_favorite).toBe(false);
+  });
+});
+
 // ─── replaceLocalTransaction ──────────────────────────────────────────────────
 
 describe("replaceLocalTransaction", () => {

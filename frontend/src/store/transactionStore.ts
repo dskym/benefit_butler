@@ -33,7 +33,7 @@ interface TransactionState {
   createTransaction: (data: TransactionCreate, isOnline?: boolean) => Promise<void>;
   updateTransaction: (id: string, data: TransactionUpdate, isOnline?: boolean) => Promise<void>;
   deleteTransaction: (id: string, isOnline?: boolean) => Promise<void>;
-  toggleFavorite: (id: string, isFavorite: boolean) => Promise<void>;
+  toggleFavorite: (id: string, isFavorite: boolean, isOnline?: boolean) => Promise<void>;
   replaceLocalTransaction: (localId: string, serverTx: Transaction) => void;
 }
 
@@ -127,13 +127,39 @@ export const useTransactionStore = create<TransactionState>()(
         set((s) => ({ transactions: s.transactions.filter((t) => t.id !== id) }));
       },
 
-      toggleFavorite: async (id, isFavorite) => {
-        const { data } = await apiClient.patch(`/transactions/${id}/favorite`, {
-          is_favorite: isFavorite,
-        });
+      toggleFavorite: async (id, isFavorite, isOnline = true) => {
+        // 낙관적 업데이트
         set((s) => ({
-          transactions: s.transactions.map((t) => (t.id === id ? data : t)),
+          transactions: s.transactions.map((t) =>
+            t.id === id ? { ...t, is_favorite: isFavorite, _isPending: !isOnline } : t,
+          ),
         }));
+
+        if (!isOnline) {
+          usePendingMutationsStore.getState().enqueue({
+            type: 'TOGGLE_FAVORITE',
+            resource: 'transaction',
+            payload: { id, isFavorite },
+          });
+          return;
+        }
+
+        try {
+          await apiClient.patch(`/transactions/${id}/favorite`, { is_favorite: isFavorite });
+          set((s) => ({
+            transactions: s.transactions.map((t) =>
+              t.id === id ? { ...t, _isPending: false } : t,
+            ),
+          }));
+        } catch (err) {
+          // 롤백
+          set((s) => ({
+            transactions: s.transactions.map((t) =>
+              t.id === id ? { ...t, is_favorite: !isFavorite, _isPending: false } : t,
+            ),
+          }));
+          throw err;
+        }
       },
 
       replaceLocalTransaction: (localId, serverTx) =>
