@@ -17,6 +17,7 @@ import { useCategoryStore } from "../../store/categoryStore";
 import { Category } from "../../types";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../../theme";
+import { useNetworkStatus } from "../../hooks/useNetworkStatus";
 
 type CategoryType = "income" | "expense" | "transfer";
 
@@ -155,6 +156,7 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
 export default function CategoryListScreen() {
   const { categories, isLoading, fetchCategories, createCategory, updateCategory, deleteCategory } =
     useCategoryStore();
+  const { isOnline } = useNetworkStatus();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
@@ -163,17 +165,32 @@ export default function CategoryListScreen() {
     fetchCategories();
   }, []);
 
+  function checkOnlineOrAlert(): boolean {
+    if (!isOnline) {
+      Alert.alert(
+        '오프라인 상태',
+        '카테고리 변경은 인터넷 연결이 필요합니다.\n연결 후 다시 시도해주세요.',
+        [{ text: '확인' }],
+      );
+      return false;
+    }
+    return true;
+  }
+
   const openCreate = () => {
+    if (!checkOnlineOrAlert()) return;
     setEditing(null);
     setModalVisible(true);
   };
 
   const openEdit = (item: Category) => {
+    if (!checkOnlineOrAlert()) return;
     setEditing(item);
     setModalVisible(true);
   };
 
   const handleDelete = (item: Category) => {
+    if (!checkOnlineOrAlert()) return;
     const doDelete = () => deleteCategory(item.id);
     if (Platform.OS === "web") {
       if (window.confirm(`"${item.name}" 카테고리를 삭제할까요?`)) doDelete();
@@ -186,6 +203,7 @@ export default function CategoryListScreen() {
   };
 
   const handleSubmit = async (name: string, type: CategoryType, color: string) => {
+    if (!checkOnlineOrAlert()) return;
     if (editing) {
       await updateCategory(editing.id, { name, type, color });
     } else {
