@@ -1,23 +1,25 @@
+let capturedAppStateCallback: ((state: string) => void) | null = null;
+
 jest.mock('react-native', () => ({
   Platform: { OS: 'android' },
-  Linking: { openSettings: jest.fn() },
-  ToastAndroid: { show: jest.fn(), SHORT: 1 },
-}));
-
-let capturedNotificationCallback: ((data: any) => void) | null = null;
-
-jest.mock('react-native-notification-listener', () => ({
-  __esModule: true,
-  default: {
-    isPermitted: jest.fn().mockResolvedValue(true),
-    requestPermission: jest.fn(),
-    startListening: jest.fn(),
-    stopListening: jest.fn(),
-    addListener: jest.fn().mockImplementation((_event: string, cb: (data: any) => void) => {
-      capturedNotificationCallback = cb;
+  AppState: {
+    addEventListener: jest.fn().mockImplementation((_event: string, cb: (state: string) => void) => {
+      capturedAppStateCallback = cb;
       return { remove: jest.fn() };
     }),
   },
+  ToastAndroid: { show: jest.fn(), SHORT: 1 },
+}));
+
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn().mockResolvedValue(null),
+  setItem: jest.fn().mockResolvedValue(undefined),
+  removeItem: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('react-native-notification-listener', () => ({
+  getPermissionStatus: jest.fn().mockResolvedValue('authorized'),
+  requestPermission: jest.fn(),
 }));
 
 jest.mock('../../storage', () => ({
@@ -43,10 +45,12 @@ jest.mock('@react-native-community/netinfo', () => ({
 }));
 
 import { renderHook, act } from '@testing-library/react-native';
-import NotificationListener from 'react-native-notification-listener';
-import { ToastAndroid } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState, ToastAndroid } from 'react-native';
 import { usePushAutoImport } from '../../hooks/usePushAutoImport';
 import { useFinancialImportStore } from '../../store/financialImportStore';
+
+const PENDING_PUSH_STORAGE_KEY = '@benefit_butler/pending_push';
 
 const INITIAL_STORE = {
   isSmsEnabled: false,
@@ -57,108 +61,113 @@ const INITIAL_STORE = {
   isImporting: false,
 };
 
-const FINANCIAL_NOTIFICATION = {
-  app: 'com.kakaobank.channel',
-  title: 'KB국민카드',
-  text: '[KB국민카드] 5,300원 스타벅스 승인 01/15 13:30',
-  bigText: '',
-  titleBig: '',
-  subText: '',
-  summaryText: '',
-  audioContentsURI: '',
-  imageBackgroundURI: '',
-  extraInfoText: '',
-  groupedMessages: [],
-  icon: '',
-  isClearable: true,
-  ongoing: false,
-  time: '1736913000000',
+const PENDING_ITEM = {
+  amount: 5300,
+  description: '스타벅스',
+  type: 'expense' as const,
+  transacted_at: new Date(1736913000000).toISOString(),
+  payment_type: 'credit_card' as const,
+  dedupKey: `5300:스타벅스:${Math.floor(1736913000000 / 300000)}`,
 };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  capturedNotificationCallback = null;
+  capturedAppStateCallback = null;
   useFinancialImportStore.setState(INITIAL_STORE);
-  (NotificationListener.isPermitted as jest.Mock).mockResolvedValue(true);
-  (NotificationListener.addListener as jest.Mock).mockImplementation((_e: string, cb: (data: any) => void) => {
-    capturedNotificationCallback = cb;
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
+  mockCreateTransaction.mockResolvedValue(undefined);
+  const NL = require('react-native-notification-listener');
+  (NL.getPermissionStatus as jest.Mock).mockResolvedValue('authorized');
+  (AppState.addEventListener as jest.Mock).mockImplementation((_event: string, cb: (state: string) => void) => {
+    capturedAppStateCallback = cb;
     return { remove: jest.fn() };
   });
-  mockCreateTransaction.mockResolvedValue(undefined);
 });
 
 const flush = () => new Promise(resolve => setTimeout(resolve, 0));
 
 describe('usePushAutoImport', () => {
-  it('isPushEnabled가 true이면 알림 리스너를 시작한다', async () => {
-    renderHook(() => usePushAutoImport());
-    await act(async () => { await flush(); });
-    expect(NotificationListener.startListening).toHaveBeenCalled();
-  });
-  it('금융앱 패키지의 금융 알림을 파싱하여 거래를 추가한다', async () => {
-    renderHook(() => usePushAutoImport());
-    await act(async () => {
-      await flush();
-      capturedNotificationCallback?.(FINANCIAL_NOTIFICATION);
-      await flush();
-    });
-    expect(mockCreateTransaction).toHaveBeenCalledTimes(1);
-    expect(mockCreateTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 5300 }),
-      expect.any(Boolean)
-    );
-  });
-  it('금융앱이 아닌 패키지의 알림은 무시한다', async () => {
-    renderHook(() => usePushAutoImport());
-    await act(async () => {
-      await flush();
-      capturedNotificationCallback?.({ ...FINANCIAL_NOTIFICATION, app: 'com.example.app' });
-      await flush();
-    });
-    expect(mockCreateTransaction).not.toHaveBeenCalled();
-  });
-  it('이미 dedup 서명이 있는 알림은 추가하지 않는다', async () => {
-    const key = `5300:스타벅스:${Math.floor(1736913000000 / 300000)}`;
-    useFinancialImportStore.setState({ ...INITIAL_STORE, dedupSignatures: [key] });
-    renderHook(() => usePushAutoImport());
-    await act(async () => {
-      await flush();
-      capturedNotificationCallback?.(FINANCIAL_NOTIFICATION);
-      await flush();
-    });
-    expect(mockCreateTransaction).not.toHaveBeenCalled();
-  });
-  it('거래 추가 후 dedup 서명을 저장한다', async () => {
-    renderHook(() => usePushAutoImport());
-    await act(async () => {
-      await flush();
-      capturedNotificationCallback?.(FINANCIAL_NOTIFICATION);
-      await flush();
-    });
-    expect(useFinancialImportStore.getState().dedupSignatures.length).toBeGreaterThan(0);
-  });
-  it('isPushEnabled가 false이면 리스너를 시작하지 않는다', async () => {
+  it('isPushEnabled가 false이면 아무것도 하지 않는다', async () => {
     useFinancialImportStore.setState({ ...INITIAL_STORE, isPushEnabled: false });
     renderHook(() => usePushAutoImport());
     await act(async () => { await flush(); });
-    expect(NotificationListener.startListening).not.toHaveBeenCalled();
+    expect(AsyncStorage.getItem).not.toHaveBeenCalled();
   });
-  it('권한이 없으면 리스너를 시작하지 않는다', async () => {
-    (NotificationListener.isPermitted as jest.Mock).mockResolvedValue(false);
+
+  it('권한이 있으면 requestPermission을 호출하지 않는다', async () => {
     renderHook(() => usePushAutoImport());
     await act(async () => { await flush(); });
-    expect(NotificationListener.startListening).not.toHaveBeenCalled();
+    const NL = require('react-native-notification-listener');
+    expect(NL.requestPermission).not.toHaveBeenCalled();
   });
-  it('거래 추가 후 ToastAndroid로 알림을 표시한다', async () => {
+
+  it('권한이 없으면 requestPermission을 호출한다', async () => {
+    const NL = require('react-native-notification-listener');
+    (NL.getPermissionStatus as jest.Mock).mockResolvedValue('denied');
     renderHook(() => usePushAutoImport());
-    await act(async () => {
-      await flush();
-      capturedNotificationCallback?.(FINANCIAL_NOTIFICATION);
-      await flush();
-    });
+    await act(async () => { await flush(); });
+    expect(NL.requestPermission).toHaveBeenCalled();
+  });
+
+  it('pending 항목이 있으면 createTransaction을 호출한다', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify([PENDING_ITEM]));
+    renderHook(() => usePushAutoImport());
+    await act(async () => { await flush(); });
+    expect(mockCreateTransaction).toHaveBeenCalledTimes(1);
+    expect(mockCreateTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 5300, description: '스타벅스' }),
+      expect.any(Boolean)
+    );
+  });
+
+  it('처리된 항목은 AsyncStorage에서 제거된다', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify([PENDING_ITEM]));
+    renderHook(() => usePushAutoImport());
+    await act(async () => { await flush(); });
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      PENDING_PUSH_STORAGE_KEY,
+      JSON.stringify([])
+    );
+  });
+
+  it('dedup 서명이 있는 항목은 createTransaction을 호출하지 않는다', async () => {
+    useFinancialImportStore.setState({ ...INITIAL_STORE, dedupSignatures: [PENDING_ITEM.dedupKey] });
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify([PENDING_ITEM]));
+    renderHook(() => usePushAutoImport());
+    await act(async () => { await flush(); });
+    expect(mockCreateTransaction).not.toHaveBeenCalled();
+  });
+
+  it('거래 추가 후 dedupSignatures에 서명을 저장한다', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify([PENDING_ITEM]));
+    renderHook(() => usePushAutoImport());
+    await act(async () => { await flush(); });
+    expect(useFinancialImportStore.getState().dedupSignatures).toContain(PENDING_ITEM.dedupKey);
+  });
+
+  it('거래 추가 후 ToastAndroid로 알림을 표시한다', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify([PENDING_ITEM]));
+    renderHook(() => usePushAutoImport());
+    await act(async () => { await flush(); });
     expect(ToastAndroid.show).toHaveBeenCalledWith(
-      expect.stringContaining('스타벅스'),
+      expect.stringContaining('1건의 거래를 추가했습니다'),
       expect.any(Number)
     );
+  });
+
+  it('AppState active 이벤트 시 pending 항목을 다시 처리한다', async () => {
+    (AsyncStorage.getItem as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(JSON.stringify([PENDING_ITEM]));
+
+    renderHook(() => usePushAutoImport());
+    await act(async () => { await flush(); });
+
+    await act(async () => {
+      capturedAppStateCallback?.('active');
+      await flush();
+    });
+
+    expect(mockCreateTransaction).toHaveBeenCalledTimes(1);
   });
 });

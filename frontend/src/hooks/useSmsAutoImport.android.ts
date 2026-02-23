@@ -34,7 +34,7 @@ async function requestSmsPermission(): Promise<boolean> {
 
 function readSmsInbox(minDate: number): Promise<RawSmsItem[]> {
   return new Promise((resolve) => {
-    const SmsAndroid = require('react-native-get-sms-android').default;
+    const SmsAndroid = require('react-native-get-sms-android');
     SmsAndroid.list(
       JSON.stringify({ box: 'inbox', minDate, maxCount: 500, indexFrom: 0 }),
       () => resolve([]),

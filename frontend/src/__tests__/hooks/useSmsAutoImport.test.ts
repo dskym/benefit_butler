@@ -9,8 +9,7 @@ jest.mock('react-native', () => ({
 }));
 
 jest.mock('react-native-get-sms-android', () => ({
-  __esModule: true,
-  default: { list: jest.fn() },
+  list: jest.fn(),
 }));
 
 jest.mock('../../storage', () => ({
