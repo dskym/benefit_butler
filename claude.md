@@ -77,15 +77,16 @@ frontend/src/
 │   └── categories/  CategoryListScreen  ← 설정 탭에서 push 이동
 ├── store/
 │   ├── authStore.ts            # persist + 오프라인 시 캐시 유저 유지
-│   ├── transactionStore.ts     # persist + 오프라인 낙관적 업데이트
+│   ├── transactionStore.ts     # persist + 오프라인 낙관적 업데이트 (toggleFavorite 포함)
 │   ├── categoryStore.ts        # persist
-│   └── pendingMutationsStore.ts  # 오프라인 FIFO 큐 (MMKV 영속)
+│   ├── pendingMutationsStore.ts  # 오프라인 FIFO 큐 (MMKV 영속) + retryCount + incrementRetry
+│   └── syncStatusStore.ts      # 동기화 상태 (isSyncing, lastSyncAt persist, syncError)
 ├── storage/index.ts            # MMKV 초기화 + SecureStore 암호화 키 + Zustand adapter
 ├── hooks/useNetworkStatus.ts   # NetInfo 래퍼 (isOnline 상태)
 ├── services/
 │   ├── api.ts                  # Axios + JWT 인터셉터
-│   └── syncService.ts          # 오프라인 큐 서버 재전송 (re-entrancy guard)
-├── components/OfflineBanner.tsx  # 오프라인/동기화 중 애니메이션 배너
+│   └── syncService.ts          # 오프라인 큐 재전송: 재시도 전략 + syncStatusStore 연동
+├── components/OfflineBanner.tsx  # 오프라인(주황)/동기화 중(파랑) 두 상태 구분 배너
 └── types/index.ts              # User, Category, Transaction, PendingMutation 인터페이스
 ```
 
@@ -103,6 +104,29 @@ RootNavigation
                     ├── SettingsScreen
                     └── CategoryListScreen
 ```
+
+### 오프라인 아키텍처
+
+#### 동기화 재시도 전략 (`syncService.ts`)
+| 에러 종류 | 처리 방식 |
+|-----------|-----------|
+| 4xx (400, 404 등) | 즉시 큐에서 제거 (영구 실패, 재시도 불가) |
+| 5xx / 네트워크 오류 | `incrementRetry`. `retryCount ≥ 3`이면 제거, 아니면 flush 중단 (FIFO 순서 보장) |
+| 401/403 | flush 전체 중단 (인증 오류 — 재로그인 필요) |
+
+#### 카테고리 오프라인 정책
+- 카테고리 mutation(CREATE/UPDATE/DELETE)은 **오프라인 큐 미지원** — 트랜잭션이 오프라인 카테고리 ID를 참조하면 sync 순서 보장 불가
+- 오프라인 상태에서 mutation 시도 시 `Alert`으로 명확한 안내 메시지 표시
+
+#### 동기화 상태 (`syncStatusStore.ts`)
+- `isSyncing`: flush 진행 중 여부 (UI 비활성화용)
+- `lastSyncAt`: 마지막 성공 시각 (persist — 앱 재시작 후에도 유지)
+- `syncError`: 마지막 실패 메시지 (다음 성공 시 자동 초기화)
+
+#### `toggleFavorite` 오프라인 지원
+- 오프라인: 낙관적 업데이트(`is_favorite`, `_isPending: true`) + `TOGGLE_FAVORITE` 큐 enqueue
+- 온라인 성공: `_isPending: false`
+- 온라인 실패: `is_favorite` 원복 + throw
 
 ### 디자인 시스템
 - **Primary**: `#3182F6` (토스 블루)
@@ -127,6 +151,7 @@ EXPO_PUBLIC_API_URL=http://localhost:8000   # 백엔드 API 베이스 URL
 | 설정 화면 (프로필 + 카테고리 관리) | ✅ 완료 |
 | AI 자동 카테고리 분류 (가맹점명 기반) | ✅ 완료 |
 | 오프라인 지원 (MMKV 캐싱 + 낙관적 업데이트 + 펜딩 큐 자동 동기화) | ✅ 완료 |
+| 오프라인 퍼스트 완성 (재시도 전략 + toggleFavorite 오프라인 + 동기화 상태 UI + 카테고리 가드) | ✅ 완료 |
 | Excel 업로드 자동 파싱 | ⬜ 미구현 |
 | SMS/푸시 실시간 파싱 | ⬜ 미구현 |
 | 카드 실적 트래커 | ⬜ 미구현 |
@@ -164,6 +189,15 @@ cd frontend && npm test -- --watchAll=false  # CI 모드
   - 각 테스트 전 `useXxxStore.setState(초기값)` + `jest.clearAllMocks()`으로 상태 초기화
   - 성공 케이스 + 실패 케이스(에러 전파 / `isLoading` 리셋) 모두 작성
   - Hook 테스트: `@testing-library/react-native`의 `renderHook` + `act` 사용 (react-hooks 라이브러리 React 19 미지원)
+  - `syncStatusStore` 등 `createPlatformStorage`만 사용하는 store 테스트 시 축약 mock 가능:
+    ```typescript
+    jest.mock('../../storage', () => ({
+      createPlatformStorage: jest.fn(() => ({
+        getItem: jest.fn().mockReturnValue(null), setItem: jest.fn(), removeItem: jest.fn(),
+      })),
+    }));
+    ```
+  - `syncService` 테스트 시 `usePendingMutationsStore`, `useTransactionStore`, `useSyncStatusStore` 모두 모킹 필수. `syncService['_isFlushing'] = false`로 re-entrancy 초기화
 
 ### Backend (FastAPI / Python)
 
