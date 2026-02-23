@@ -41,7 +41,9 @@ export async function initStorage(): Promise<void> {
     }
     _mmkv = new MMKV({ id: 'benefit-butler', encryptionKey: encKey });
   } catch (err) {
-    console.warn('[storage] MMKV init failed, using AsyncStorage fallback', err);
+    // Expo Go does not bundle native modules — MMKV always falls back here.
+    // In a custom dev build / production build this should not appear.
+    console.log('[storage] MMKV unavailable, using AsyncStorage fallback', err);
     _useAsyncFallback = true;
   } finally {
     _resolveReady();
