@@ -14,7 +14,19 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../store/authStore";
 import { useFinancialImportStore } from "../../store/financialImportStore";
+import { useSyncStatusStore } from "../../store/syncStatusStore";
+import { usePendingMutationsStore } from "../../store/pendingMutationsStore";
+import { syncService } from "../../services/syncService";
+import { useNetworkStatus } from "../../hooks/useNetworkStatus";
 import { theme } from "../../theme";
+
+function formatLastSync(ts: number | null): string {
+  if (!ts) return '동기화 기록 없음';
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return '방금 전';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}분 전`;
+  return new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+}
 
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
@@ -26,6 +38,11 @@ export default function SettingsScreen() {
     setSmsEnabled,
     setPushEnabled,
   } = useFinancialImportStore();
+  const { isOnline } = useNetworkStatus();
+  const isSyncing = useSyncStatusStore((s) => s.isSyncing);
+  const lastSyncAt = useSyncStatusStore((s) => s.lastSyncAt);
+  const syncError = useSyncStatusStore((s) => s.syncError);
+  const pendingCount = usePendingMutationsStore((s) => s.queue.length);
 
   const handleLogout = () => {
     if (Platform.OS === "web") {
@@ -120,6 +137,41 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      {/* 데이터 동기화 섹션 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>데이터 동기화</Text>
+        <View style={styles.sectionCard}>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>미동기화 항목</Text>
+            <Text style={[styles.rowValue, pendingCount > 0 && { color: '#FF9500' }]}>
+              {pendingCount}개
+            </Text>
+          </View>
+          <View style={[styles.row, !syncError && styles.rowLast]}>
+            <Text style={styles.rowLabel}>마지막 동기화</Text>
+            <Text style={styles.rowValue}>{formatLastSync(lastSyncAt)}</Text>
+          </View>
+          {syncError && (
+            <View style={[styles.row, styles.rowLast]}>
+              <Text style={styles.syncError}>{syncError}</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={[
+              styles.syncButton,
+              (!isOnline || pendingCount === 0 || isSyncing) && styles.syncButtonDisabled,
+            ]}
+            onPress={() => syncService.flush()}
+            disabled={!isOnline || pendingCount === 0 || isSyncing}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.syncButtonText}>
+              {isSyncing ? '동기화 중...' : '지금 동기화'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* 앱 정보 섹션 */}
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>앱 정보</Text>
@@ -199,6 +251,17 @@ const styles = StyleSheet.create({
   rowChevron: { fontSize: 20, color: theme.colors.text.hint },
   rowValue: { fontSize: 15, color: theme.colors.text.secondary },
   rowSub: { fontSize: 12, color: theme.colors.text.secondary, marginTop: 2 },
+  syncButton: {
+    margin: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    paddingVertical: 10,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+  },
+  syncButtonDisabled: { backgroundColor: theme.colors.border },
+  syncButtonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  syncError: { fontSize: 12, color: theme.colors.expense, flex: 1 },
   logoutBtn: {
     backgroundColor: theme.colors.bg,
     borderRadius: theme.radius.lg,
