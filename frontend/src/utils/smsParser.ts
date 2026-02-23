@@ -14,7 +14,7 @@ const FINANCIAL_SENDER_NAMES = [
   'SC제일', '씨티', '토스뱅크',
 ];
 const FINANCIAL_BODY_KEYWORDS = ['승인', '결제', '출금', '입금', '이체', '완료', '사용', '거래'];
-const AMOUNT_REGEX = /(\d{1,3}(?:,\d{3})*(?:\.\d+)?)원/;
+const AMOUNT_REGEX = /(\d+(?:,\d{3})*)(?:\.\d+)?원/;
 
 export function isFinancialText(
   text: string,
