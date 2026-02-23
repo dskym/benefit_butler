@@ -654,7 +654,7 @@ export default function TransactionListScreen() {
   const handleToggleFavorite = async () => {
     if (!contextTx) return;
     try {
-      await toggleFavorite(contextTx.id, !contextTx.is_favorite);
+      await toggleFavorite(contextTx.id, !contextTx.is_favorite, isOnline);
     } catch (e: any) {
       Alert.alert("오류", e.response?.data?.detail ?? "즐겨찾기 변경에 실패했습니다.");
     } finally {

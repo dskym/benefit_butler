@@ -55,4 +55,5 @@ export interface PendingMutation {
   payload: unknown;
   localId?: string;   // CREATE 시 임시 UUID
   createdAt: number;
+  retryCount: number;
 }

@@ -78,3 +78,23 @@ describe('clearAll', () => {
     expect(usePendingMutationsStore.getState().queue).toHaveLength(0);
   });
 });
+
+describe('retryCount', () => {
+  it('enqueue 시 retryCount: 0으로 초기화된다', () => {
+    const id = usePendingMutationsStore.getState().enqueue(make());
+    expect(usePendingMutationsStore.getState().queue.find((m) => m.id === id)?.retryCount).toBe(0);
+  });
+
+  it('incrementRetry가 해당 mutation의 retryCount를 1 증가시킨다', () => {
+    const id = usePendingMutationsStore.getState().enqueue(make());
+    usePendingMutationsStore.getState().incrementRetry(id);
+    expect(usePendingMutationsStore.getState().queue.find((m) => m.id === id)?.retryCount).toBe(1);
+  });
+
+  it('incrementRetry는 다른 mutation에 영향을 주지 않는다', () => {
+    const id1 = usePendingMutationsStore.getState().enqueue(make());
+    const id2 = usePendingMutationsStore.getState().enqueue(make());
+    usePendingMutationsStore.getState().incrementRetry(id1);
+    expect(usePendingMutationsStore.getState().queue.find((m) => m.id === id2)?.retryCount).toBe(0);
+  });
+});
