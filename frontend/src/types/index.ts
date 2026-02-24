@@ -24,7 +24,21 @@ export interface UserCard {
   type: "credit_card" | "debit_card";
   name: string;
   monthly_target: number | null;
+  billing_day: number | null;  // 1~28; null = calendar month
   created_at: string;
+}
+
+export interface CardPerformanceItem {
+  card_id: string;
+  card_name: string;
+  card_type: "credit_card" | "debit_card";
+  monthly_target: number | null;
+  billing_day: number | null;
+  period_start: string;  // ISO date "YYYY-MM-DD"
+  period_end: string;    // ISO date "YYYY-MM-DD"
+  current_spending: number;
+  remaining: number | null;
+  achievement_percent: number | null;
 }
 
 export interface Transaction {

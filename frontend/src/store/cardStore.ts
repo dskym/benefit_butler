@@ -6,6 +6,13 @@ import { apiClient } from "../services/api";
 interface CardCreate {
   type: "credit_card" | "debit_card";
   name: string;
+  monthly_target?: number | null;
+  billing_day?: number | null;
+}
+
+interface CardPatch {
+  monthly_target?: number | null;
+  billing_day?: number | null;
 }
 
 interface CardState {
@@ -13,7 +20,7 @@ interface CardState {
   isLoading: boolean;
   fetchCards: () => Promise<void>;
   createCard: (data: CardCreate) => Promise<UserCard>;
-  updateCard: (id: string, monthly_target: number | null) => Promise<void>;
+  updateCard: (id: string, patch: CardPatch) => Promise<void>;
   deleteCard: (id: string) => Promise<void>;
 }
 
@@ -37,9 +44,9 @@ export const useCardStore = create<CardState>((set) => ({
     return data;
   },
 
-  updateCard: async (id, monthly_target) => {
-    const { data } = await apiClient.patch(`/cards/${id}`, { monthly_target });
-    set((s) => ({ cards: s.cards.map((c) => c.id === id ? data : c) }));
+  updateCard: async (id, patch) => {
+    const { data } = await apiClient.patch(`/cards/${id}`, patch);
+    set((s) => ({ cards: s.cards.map((c) => (c.id === id ? data : c)) }));
   },
 
   deleteCard: async (id) => {

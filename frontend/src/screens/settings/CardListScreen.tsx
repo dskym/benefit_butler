@@ -27,33 +27,46 @@ const TYPE_LABELS: Record<CardType, string> = {
 
 const TYPE_ORDER: CardType[] = ["credit_card", "debit_card"];
 
+// ── 공통 폼 필드 ──────────────────────────────────────────────
+
+interface CardFormFields {
+  name: string;
+  type: CardType;
+  monthly_target: string;  // raw string input, converted on submit
+  billing_day: string;     // raw string input, 1~28
+}
+
 // ── 추가 모달 ──────────────────────────────────────────────
+
 interface AddModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (name: string, type: CardType) => Promise<void>;
+  onSubmit: (fields: CardFormFields) => Promise<void>;
 }
 
 function AddModal({ visible, onClose, onSubmit }: AddModalProps) {
-  const [name, setName] = useState("");
-  const [type, setType] = useState<CardType>("credit_card");
+  const [fields, setFields] = useState<CardFormFields>({
+    name: "",
+    type: "credit_card",
+    monthly_target: "",
+    billing_day: "",
+  });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (visible) {
-      setName("");
-      setType("credit_card");
+      setFields({ name: "", type: "credit_card", monthly_target: "", billing_day: "" });
     }
   }, [visible]);
 
   const handleSubmit = async () => {
-    if (!name.trim()) {
+    if (!fields.name.trim()) {
       Alert.alert("오류", "카드 이름을 입력해주세요.");
       return;
     }
     setLoading(true);
     try {
-      await onSubmit(name.trim(), type);
+      await onSubmit(fields);
       onClose();
     } catch (e: any) {
       Alert.alert("오류", e.response?.data?.detail ?? "저장에 실패했습니다.");
@@ -72,8 +85,8 @@ function AddModal({ visible, onClose, onSubmit }: AddModalProps) {
             <Text style={styles.label}>카드 이름</Text>
             <TextInput
               style={styles.input}
-              value={name}
-              onChangeText={setName}
+              value={fields.name}
+              onChangeText={(v) => setFields((f) => ({ ...f, name: v }))}
               placeholder="예: 신한 SOL 체크카드"
               placeholderTextColor={theme.colors.text.hint}
               autoFocus
@@ -86,16 +99,124 @@ function AddModal({ visible, onClose, onSubmit }: AddModalProps) {
                   key={t}
                   style={[
                     styles.typeBtn,
-                    type === t && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+                    fields.type === t && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
                   ]}
-                  onPress={() => setType(t)}
+                  onPress={() => setFields((f) => ({ ...f, type: t }))}
                 >
-                  <Text style={[styles.typeBtnText, type === t && { color: "#fff" }]}>
+                  <Text style={[styles.typeBtnText, fields.type === t && { color: "#fff" }]}>
                     {TYPE_LABELS[t]}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
+
+            <Text style={styles.label}>월 실적 목표 (원, 선택)</Text>
+            <TextInput
+              style={styles.input}
+              value={fields.monthly_target}
+              onChangeText={(v) => setFields((f) => ({ ...f, monthly_target: v.replace(/[^0-9]/g, "") }))}
+              keyboardType="numeric"
+              placeholder="예: 300000"
+              placeholderTextColor={theme.colors.text.hint}
+            />
+
+            <Text style={styles.label}>결제일 (1~28, 선택)</Text>
+            <TextInput
+              style={styles.input}
+              value={fields.billing_day}
+              onChangeText={(v) => setFields((f) => ({ ...f, billing_day: v.replace(/[^0-9]/g, "") }))}
+              keyboardType="numeric"
+              placeholder="예: 14  (비워두면 달력 월 기준)"
+              placeholderTextColor={theme.colors.text.hint}
+            />
+            <Text style={styles.hint}>결제일 14일이 실적 관리에 가장 편리합니다.</Text>
+
+            <View style={styles.sheetActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+                <Text style={styles.cancelBtnText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitBtn, loading && { opacity: 0.6 }]}
+                onPress={handleSubmit}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.submitBtnText}>저장</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ── 편집 모달 ──────────────────────────────────────────────
+
+interface EditModalProps {
+  card: UserCard | null;
+  onClose: () => void;
+  onSubmit: (card: UserCard, fields: Pick<CardFormFields, "monthly_target" | "billing_day">) => Promise<void>;
+}
+
+function EditModal({ card, onClose, onSubmit }: EditModalProps) {
+  const [fields, setFields] = useState({ monthly_target: "", billing_day: "" });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (card) {
+      setFields({
+        monthly_target: card.monthly_target !== null ? String(card.monthly_target) : "",
+        billing_day: card.billing_day !== null ? String(card.billing_day) : "",
+      });
+    }
+  }, [card]);
+
+  if (!card) return null;
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      await onSubmit(card, fields);
+      onClose();
+    } catch (e: any) {
+      Alert.alert("오류", e.response?.data?.detail ?? "저장에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal visible={!!card} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <View style={styles.sheet}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={styles.sheetTitle}>{card.name} 설정</Text>
+
+            <Text style={styles.label}>월 실적 목표 (원, 선택)</Text>
+            <TextInput
+              style={styles.input}
+              value={fields.monthly_target}
+              onChangeText={(v) => setFields((f) => ({ ...f, monthly_target: v.replace(/[^0-9]/g, "") }))}
+              keyboardType="numeric"
+              placeholder="예: 300000"
+              placeholderTextColor={theme.colors.text.hint}
+              autoFocus
+            />
+
+            <Text style={styles.label}>결제일 (1~28, 선택)</Text>
+            <TextInput
+              style={styles.input}
+              value={fields.billing_day}
+              onChangeText={(v) => setFields((f) => ({ ...f, billing_day: v.replace(/[^0-9]/g, "") }))}
+              keyboardType="numeric"
+              placeholder="예: 14  (비워두면 달력 월 기준)"
+              placeholderTextColor={theme.colors.text.hint}
+            />
+            <Text style={styles.hint}>결제일 14일이 실적 관리에 가장 편리합니다.</Text>
 
             <View style={styles.sheetActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
@@ -121,9 +242,11 @@ function AddModal({ visible, onClose, onSubmit }: AddModalProps) {
 }
 
 // ── 메인 화면 ─────────────────────────────────────────────
+
 export default function CardListScreen() {
-  const { cards, isLoading, fetchCards, createCard, deleteCard } = useCardStore();
-  const [modalVisible, setModalVisible] = useState(false);
+  const { cards, isLoading, fetchCards, createCard, updateCard, deleteCard } = useCardStore();
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [editingCard, setEditingCard] = useState<UserCard | null>(null);
 
   useEffect(() => {
     fetchCards();
@@ -150,8 +273,27 @@ export default function CardListScreen() {
     }
   };
 
-  const handleSubmit = async (name: string, type: CardType) => {
-    await createCard({ type, name });
+  const handleAddSubmit = async (fields: CardFormFields) => {
+    const targetRaw = fields.monthly_target.trim();
+    const billingRaw = fields.billing_day.trim();
+    await createCard({
+      type: fields.type,
+      name: fields.name.trim(),
+      monthly_target: targetRaw ? parseInt(targetRaw, 10) : null,
+      billing_day: billingRaw ? Math.min(28, Math.max(1, parseInt(billingRaw, 10))) : null,
+    });
+  };
+
+  const handleEditSubmit = async (
+    card: UserCard,
+    fields: Pick<CardFormFields, "monthly_target" | "billing_day">
+  ) => {
+    const targetRaw = fields.monthly_target.trim();
+    const billingRaw = fields.billing_day.trim();
+    await updateCard(card.id, {
+      monthly_target: targetRaw ? parseInt(targetRaw, 10) : null,
+      billing_day: billingRaw ? Math.min(28, Math.max(1, parseInt(billingRaw, 10))) : null,
+    });
   };
 
   const sections = TYPE_ORDER.map((type) => ({
@@ -188,7 +330,24 @@ export default function CardListScreen() {
                         color={theme.colors.primary}
                         style={styles.cardIcon}
                       />
-                      <Text style={styles.rowName}>{card.name}</Text>
+                      <View style={styles.rowMain}>
+                        <Text style={styles.rowName}>{card.name}</Text>
+                        {(card.monthly_target !== null || card.billing_day !== null) && (
+                          <Text style={styles.rowSub}>
+                            {card.monthly_target !== null
+                              ? `목표 ${card.monthly_target.toLocaleString("ko-KR")}원`
+                              : "목표 미설정"}
+                            {card.billing_day !== null ? `  ·  결제일 ${card.billing_day}일` : ""}
+                          </Text>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        style={styles.iconBtn}
+                        onPress={() => setEditingCard(card)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="pencil-outline" size={18} color={theme.colors.primary} />
+                      </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.iconBtn}
                         onPress={() => handleDelete(card)}
@@ -213,16 +372,22 @@ export default function CardListScreen() {
 
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => setModalVisible(true)}
+        onPress={() => setAddModalVisible(true)}
         activeOpacity={0.85}
       >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
       <AddModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onSubmit={handleSubmit}
+        visible={addModalVisible}
+        onClose={() => setAddModalVisible(false)}
+        onSubmit={handleAddSubmit}
+      />
+
+      <EditModal
+        card={editingCard}
+        onClose={() => setEditingCard(null)}
+        onSubmit={handleEditSubmit}
       />
     </View>
   );
@@ -264,7 +429,9 @@ const styles = StyleSheet.create({
     marginHorizontal: theme.spacing.md,
   },
   cardIcon: { marginRight: theme.spacing.sm },
-  rowName: { flex: 1, fontSize: 16, color: theme.colors.text.primary },
+  rowMain: { flex: 1 },
+  rowName: { fontSize: 16, color: theme.colors.text.primary },
+  rowSub: { fontSize: 12, color: theme.colors.text.hint, marginTop: 2 },
   iconBtn: { padding: 6 },
   empty: {
     textAlign: "center",
@@ -296,7 +463,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: theme.radius.lg,
     borderTopRightRadius: theme.radius.lg,
     padding: theme.spacing.lg,
-    maxHeight: "60%",
+    maxHeight: "75%",
   },
   sheetTitle: { ...theme.typography.h2, color: theme.colors.text.primary, marginBottom: 20 },
   label: {
@@ -304,6 +471,11 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
     marginBottom: 6,
     marginTop: 14,
+  },
+  hint: {
+    fontSize: 12,
+    color: theme.colors.text.hint,
+    marginTop: 4,
   },
   input: {
     borderWidth: 1,

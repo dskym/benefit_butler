@@ -18,6 +18,7 @@ class UserCard(Base):
     type: Mapped[str] = mapped_column(String(20), nullable=False)  # "credit_card" | "debit_card"
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     monthly_target: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    billing_day: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 1~28; None = calendar month
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

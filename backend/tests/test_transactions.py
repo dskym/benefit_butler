@@ -4,6 +4,8 @@ Tests for /api/v1/transactions/* endpoints.
 
 Coverage:
   GET    /transactions/              – list (empty, populated, sorted)
+  GET    /transactions/?card_id=...  – filter by card
+  GET    /transactions/?from=...&to= – filter by date range
   POST   /transactions/              – create (all fields, minimal fields)
   GET    /transactions/{id}          – found, not found, user isolation
   PUT    /transactions/{id}          – partial update
@@ -25,6 +27,16 @@ TX_PAYLOAD = {
 
 def create_tx(client, headers, payload=None):
     resp = client.post("/api/v1/transactions/", headers=headers, json=payload or TX_PAYLOAD)
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+def create_card(client, headers, name="테스트카드"):
+    resp = client.post(
+        "/api/v1/cards/",
+        headers=headers,
+        json={"type": "credit_card", "name": name},
+    )
     assert resp.status_code == 201, resp.text
     return resp.json()
 
@@ -57,6 +69,105 @@ def test_list_transactions_only_returns_own_data(client, auth_headers):
     headers2 = register_and_login(client, "user2@example.com")
     resp = client.get("/api/v1/transactions/", headers=headers2)
     assert resp.json() == []
+
+
+# ── card_id filter ────────────────────────────────────────────────────────────
+
+
+def test_filter_by_card_id_returns_only_matching(client, auth_headers):
+    card1 = create_card(client, auth_headers, "카드1")
+    card2 = create_card(client, auth_headers, "카드2")
+
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "user_card_id": card1["id"]})
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "user_card_id": card2["id"]})
+    create_tx(client, auth_headers, TX_PAYLOAD)  # no card
+
+    resp = client.get(f"/api/v1/transactions/?card_id={card1['id']}", headers=auth_headers)
+    assert resp.status_code == 200
+    items = resp.json()
+    assert len(items) == 1
+    assert items[0]["user_card_id"] == card1["id"]
+
+
+def test_filter_by_card_id_returns_empty_for_unknown_card(client, auth_headers):
+    create_tx(client, auth_headers)
+    fake_card_id = "00000000-0000-0000-0000-000000000000"
+    resp = client.get(f"/api/v1/transactions/?card_id={fake_card_id}", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_filter_by_card_id_user_isolation(client, auth_headers):
+    """User 2 cannot retrieve User 1's card transactions even by guessing the card_id."""
+    card = create_card(client, auth_headers)
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "user_card_id": card["id"]})
+    headers2 = register_and_login(client, "user2@example.com")
+
+    resp = client.get(f"/api/v1/transactions/?card_id={card['id']}", headers=headers2)
+    assert resp.json() == []
+
+
+# ── date range filter ─────────────────────────────────────────────────────────
+
+
+def test_filter_by_from_date(client, auth_headers):
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "transacted_at": "2026-01-10T12:00:00+00:00"})
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "transacted_at": "2026-01-20T12:00:00+00:00"})
+
+    resp = client.get("/api/v1/transactions/?from=2026-01-15", headers=auth_headers)
+    assert resp.status_code == 200
+    items = resp.json()
+    assert len(items) == 1
+    assert "2026-01-20" in items[0]["transacted_at"]
+
+
+def test_filter_by_to_date(client, auth_headers):
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "transacted_at": "2026-01-10T12:00:00+00:00"})
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "transacted_at": "2026-01-20T12:00:00+00:00"})
+
+    resp = client.get("/api/v1/transactions/?to=2026-01-15", headers=auth_headers)
+    assert resp.status_code == 200
+    items = resp.json()
+    assert len(items) == 1
+    assert "2026-01-10" in items[0]["transacted_at"]
+
+
+def test_filter_by_date_range(client, auth_headers):
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "transacted_at": "2026-01-05T12:00:00+00:00"})
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "transacted_at": "2026-01-15T12:00:00+00:00"})
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "transacted_at": "2026-01-25T12:00:00+00:00"})
+
+    resp = client.get("/api/v1/transactions/?from=2026-01-10&to=2026-01-20", headers=auth_headers)
+    assert resp.status_code == 200
+    items = resp.json()
+    assert len(items) == 1
+    assert "2026-01-15" in items[0]["transacted_at"]
+
+
+def test_filter_includes_boundary_dates(client, auth_headers):
+    """Transactions on exactly from/to dates must be included."""
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "transacted_at": "2026-01-01T00:00:00+00:00"})
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "transacted_at": "2026-01-31T23:59:59+00:00"})
+
+    resp = client.get("/api/v1/transactions/?from=2026-01-01&to=2026-01-31", headers=auth_headers)
+    assert resp.status_code == 200
+    assert len(resp.json()) == 2
+
+
+def test_filter_by_card_and_date_combined(client, auth_headers):
+    card = create_card(client, auth_headers)
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "user_card_id": card["id"], "transacted_at": "2026-01-10T12:00:00+00:00"})
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "user_card_id": card["id"], "transacted_at": "2026-01-20T12:00:00+00:00"})
+    create_tx(client, auth_headers, {**TX_PAYLOAD, "transacted_at": "2026-01-15T12:00:00+00:00"})  # different card
+
+    resp = client.get(
+        f"/api/v1/transactions/?card_id={card['id']}&from=2026-01-15",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    items = resp.json()
+    assert len(items) == 1
+    assert "2026-01-20" in items[0]["transacted_at"]
 
 
 # ── create ────────────────────────────────────────────────────────────────────

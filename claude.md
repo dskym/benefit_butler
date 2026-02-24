@@ -77,13 +77,17 @@ frontend/src/
 │   ├── auth/        LoginScreen, RegisterScreen
 │   ├── home/        HomeScreen          ← 메인 대시보드 (차트 포함)
 │   ├── transactions/ TransactionListScreen  ← CRUD + 필터/섹션 + 오프라인 지원
-│   ├── analysis/    AnalysisScreen      ← 월별 분석 차트
+│   ├── analysis/    AnalysisScreen      ← 월별 분석 차트 + 카드별 실적 섹션
+│   │                CardPerformanceScreen ← 카드 상세 실적 + 기간별 거래 목록
 │   ├── settings/    SettingsScreen      ← 프로필 + 설정
+│   │                CardListScreen      ← 카드 추가/편집 (monthly_target, billing_day)
 │   └── categories/  CategoryListScreen  ← 설정 탭에서 push 이동
 ├── store/
 │   ├── authStore.ts              # persist + 오프라인 시 캐시 유저 유지
 │   ├── transactionStore.ts       # persist + 오프라인 낙관적 업데이트 (toggleFavorite 포함)
 │   ├── categoryStore.ts          # persist
+│   ├── cardStore.ts              # 카드 CRUD (billing_day, monthly_target 포함)
+│   ├── cardPerformanceStore.ts   # persist + GET /cards/performance 캐싱 (오프라인 stale 유지)
 │   ├── financialImportStore.ts   # SMS/푸시 임포트 상태 (isSmsEnabled, isPushEnabled, dedup, persist)
 │   ├── pendingMutationsStore.ts  # 오프라인 FIFO 큐 (MMKV 영속) + retryCount + incrementRetry
 │   └── syncStatusStore.ts        # 동기화 상태 (isSyncing, lastSyncAt persist, syncError)
@@ -109,13 +113,16 @@ RootNavigation
 ├── AuthNavigator (NativeStack)  — 비로그인
 │   ├── LoginScreen
 │   └── RegisterScreen
-└── MainNavigator (BottomTab 4탭)  — 로그인 후
-    ├── 홈      → HomeScreen
-    ├── 거래    → TransactionListScreen
-    ├── 분석    → AnalysisScreen
+└── MainNavigator (BottomTab 3탭)  — 로그인 후
+    ├── 가계부  → TransactionListScreen
+    ├── 분석    → AnalysisNavigator (NativeStack)
+    │               ├── AnalysisMain (AnalysisScreen)
+    │               └── CardPerformance (CardPerformanceScreen)
     └── 설정    → SettingsNavigator (NativeStack)
                     ├── SettingsScreen
-                    └── CategoryListScreen
+                    ├── CategoryListScreen
+                    ├── CardListScreen
+                    └── PrivacyPolicyScreen
 ```
 
 ### 오프라인 아키텍처
@@ -194,7 +201,7 @@ EXPO_PUBLIC_API_URL=http://localhost:8000   # 백엔드 API 베이스 URL
 | 오프라인 퍼스트 완성 (재시도 전략 + toggleFavorite 오프라인 + 동기화 상태 UI + 카테고리 가드) | ✅ 완료 |
 | Excel 업로드 자동 파싱 | ⬜ 미구현 |
 | SMS/푸시 실시간 파싱 (Android) | ✅ 완료 |
-| 카드 실적 트래커 | ⬜ 미구현 |
+| 카드 실적 트래커 (billing_day 기반 집계 기간 + 상세 화면) | ✅ 완료 |
 | 카드 추천 알고리즘 | ⬜ 미구현 |
 | 소셜 로그인 (카카오/구글) | ⬜ 미구현 |
 

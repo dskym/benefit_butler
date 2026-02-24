@@ -18,6 +18,7 @@ const makeCard = (id: string, name: string) => ({
   type: "credit_card" as const,
   name,
   monthly_target: null,
+  billing_day: null,
   created_at: "2026-01-01T00:00:00Z",
 });
 
@@ -98,7 +99,7 @@ describe("updateCard", () => {
     const updated = { ...card, monthly_target: 500000 };
     (apiClient.patch as jest.Mock).mockResolvedValue({ data: updated });
 
-    await useCardStore.getState().updateCard("card-1", 500000);
+    await useCardStore.getState().updateCard("card-1", { monthly_target: 500000 });
 
     const { cards } = useCardStore.getState();
     expect(cards.find((c) => c.id === "card-1")?.monthly_target).toBe(500000);
@@ -112,7 +113,7 @@ describe("updateCard", () => {
       data: { ...card, monthly_target: 300000 },
     });
 
-    await useCardStore.getState().updateCard("card-1", 300000);
+    await useCardStore.getState().updateCard("card-1", { monthly_target: 300000 });
 
     expect(apiClient.patch).toHaveBeenCalledWith("/cards/card-1", {
       monthly_target: 300000,
@@ -125,12 +126,27 @@ describe("updateCard", () => {
     const updated = { ...card, monthly_target: null };
     (apiClient.patch as jest.Mock).mockResolvedValue({ data: updated });
 
-    await useCardStore.getState().updateCard("card-1", null);
+    await useCardStore.getState().updateCard("card-1", { monthly_target: null });
 
     expect(
       useCardStore.getState().cards.find((c) => c.id === "card-1")
         ?.monthly_target
     ).toBeNull();
+  });
+
+  it("can set billing_day along with monthly_target", async () => {
+    const card = makeCard("card-1", "신한카드");
+    useCardStore.setState({ cards: [card] });
+    const updated = { ...card, monthly_target: 300000, billing_day: 14 };
+    (apiClient.patch as jest.Mock).mockResolvedValue({ data: updated });
+
+    await useCardStore.getState().updateCard("card-1", { monthly_target: 300000, billing_day: 14 });
+
+    expect(apiClient.patch).toHaveBeenCalledWith("/cards/card-1", {
+      monthly_target: 300000,
+      billing_day: 14,
+    });
+    expect(useCardStore.getState().cards.find((c) => c.id === "card-1")?.billing_day).toBe(14);
   });
 });
 
