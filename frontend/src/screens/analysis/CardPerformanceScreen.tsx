@@ -68,7 +68,7 @@ export default function CardPerformanceScreen() {
           <Text style={styles.cardName}>{item.card_name}</Text>
           {achieved && (
             <View style={styles.achievedBadge}>
-              <Text style={styles.achievedBadgeText}>달성!</Text>
+              <Text style={styles.achievedBadgeText}>실적 달성 ✓</Text>
             </View>
           )}
         </View>
@@ -106,7 +106,7 @@ export default function CardPerformanceScreen() {
 
             {!achieved && item.remaining !== null && item.remaining > 0 && (
               <Text style={styles.remainingMsg}>
-                {fmt(item.remaining)} 더 쓰면 혜택 달성!
+                {fmt(item.remaining)} 더 쓰면 이번 달 실적 달성!
               </Text>
             )}
           </>

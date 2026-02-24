@@ -392,7 +392,7 @@ export default function AnalysisScreen({ navigation }: { navigation?: any }) {
                     </View>
                     {achieved && (
                       <View style={styles.perfAchievedBadge}>
-                        <Text style={styles.perfAchievedBadgeText}>달성!</Text>
+                        <Text style={styles.perfAchievedBadgeText}>실적 달성 ✓</Text>
                       </View>
                     )}
                     <Text style={styles.perfChevron}>›</Text>
@@ -425,7 +425,7 @@ export default function AnalysisScreen({ navigation }: { navigation?: any }) {
                       </View>
                       {!achieved && perf.remaining !== null && perf.remaining > 0 && (
                         <Text style={styles.perfRemainingMsg}>
-                          {fmt(perf.remaining)} 더 쓰면 혜택 달성!
+                          {fmt(perf.remaining)} 더 쓰면 이번 달 실적 달성!
                         </Text>
                       )}
                     </>
