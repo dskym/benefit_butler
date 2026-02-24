@@ -5,10 +5,18 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.auth import get_current_user
 from app.core.database import get_db
-from app.schemas.user_card import UserCardCreate, UserCardResponse, UserCardUpdate
+from app.schemas.user_card import CardPerformanceItem, UserCardCreate, UserCardResponse, UserCardUpdate
 import app.services.user_card as card_service
 
 router = APIRouter(prefix="/cards", tags=["cards"])
+
+
+@router.get("/performance", response_model=list[CardPerformanceItem])
+def get_performance(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return card_service.get_cards_performance(db, current_user.id)
 
 
 @router.get("/", response_model=list[UserCardResponse])

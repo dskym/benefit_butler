@@ -17,6 +17,7 @@ import LoginScreen from "../screens/auth/LoginScreen";
 import RegisterScreen from "../screens/auth/RegisterScreen";
 import TransactionListScreen from "../screens/transactions/TransactionListScreen";
 import AnalysisScreen from "../screens/analysis/AnalysisScreen";
+import CardPerformanceScreen from "../screens/analysis/CardPerformanceScreen";
 import SettingsScreen from "../screens/settings/SettingsScreen";
 import CategoryListScreen from "../screens/categories/CategoryListScreen";
 import CardListScreen from "../screens/settings/CardListScreen";
@@ -27,6 +28,7 @@ import { theme } from "../theme";
 const AuthStack = createNativeStackNavigator();
 const MainTab = createBottomTabNavigator();
 const SettingsStack = createNativeStackNavigator();
+const AnalysisStack = createNativeStackNavigator();
 
 function AuthNavigator() {
   return (
@@ -79,6 +81,28 @@ function SettingsNavigator() {
   );
 }
 
+function AnalysisNavigator() {
+  return (
+    <AnalysisStack.Navigator>
+      <AnalysisStack.Screen
+        name="AnalysisMain"
+        component={AnalysisScreen}
+        options={{ headerShown: false }}
+      />
+      <AnalysisStack.Screen
+        name="CardPerformance"
+        component={CardPerformanceScreen}
+        options={{
+          title: "카드 실적",
+          headerStyle: { backgroundColor: theme.colors.bg },
+          headerTintColor: theme.colors.primary,
+          headerTitleStyle: { color: theme.colors.text.primary, fontWeight: "700" },
+        }}
+      />
+    </AnalysisStack.Navigator>
+  );
+}
+
 function MainNavigator() {
   return (
     <MainTab.Navigator
@@ -106,7 +130,7 @@ function MainNavigator() {
       })}
     >
       <MainTab.Screen name="가계부" component={TransactionListScreen} />
-      <MainTab.Screen name="분석" component={AnalysisScreen} />
+      <MainTab.Screen name="분석" component={AnalysisNavigator} />
       <MainTab.Screen name="설정" component={SettingsNavigator} />
     </MainTab.Navigator>
   );

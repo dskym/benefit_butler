@@ -1,7 +1,8 @@
 # backend/app/api/v1/endpoints/transactions.py
 import uuid
+from datetime import date
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.auth import get_current_user
@@ -13,8 +14,14 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 
 @router.get("/", response_model=list[TransactionResponse])
-def list_transactions(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    return transaction_service.list_transactions(db, current_user.id)
+def list_transactions(
+    card_id: uuid.UUID | None = None,
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    return transaction_service.list_transactions(db, current_user.id, card_id, from_date, to_date)
 
 
 @router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)

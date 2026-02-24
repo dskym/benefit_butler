@@ -1,5 +1,6 @@
 # backend/app/services/transaction.py
 import uuid
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -9,13 +10,25 @@ from app.models.transaction import Transaction
 from app.schemas.transaction import TransactionCreate, TransactionUpdate
 
 
-def list_transactions(db: Session, user_id: uuid.UUID) -> list[Transaction]:
+def list_transactions(
+    db: Session,
+    user_id: uuid.UUID,
+    card_id: uuid.UUID | None = None,
+    from_date: date | None = None,
+    to_date: date | None = None,
+) -> list[Transaction]:
+    query = select(Transaction).where(Transaction.user_id == user_id)
+    if card_id is not None:
+        query = query.where(Transaction.user_card_id == card_id)
+    if from_date is not None:
+        start_dt = datetime(from_date.year, from_date.month, from_date.day, tzinfo=timezone.utc)
+        query = query.where(Transaction.transacted_at >= start_dt)
+    if to_date is not None:
+        next_day = to_date + timedelta(days=1)
+        end_dt = datetime(next_day.year, next_day.month, next_day.day, tzinfo=timezone.utc)
+        query = query.where(Transaction.transacted_at < end_dt)
     return list(
-        db.scalars(
-            select(Transaction)
-            .where(Transaction.user_id == user_id)
-            .order_by(Transaction.transacted_at.desc())
-        ).all()
+        db.scalars(query.order_by(Transaction.transacted_at.desc())).all()
     )
 
 
