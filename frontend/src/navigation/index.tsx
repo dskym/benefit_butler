@@ -22,6 +22,8 @@ import SettingsScreen from "../screens/settings/SettingsScreen";
 import CategoryListScreen from "../screens/categories/CategoryListScreen";
 import CardListScreen from "../screens/settings/CardListScreen";
 import PrivacyPolicyScreen from "../screens/settings/PrivacyPolicyScreen";
+import CardRecommendScreen from "../screens/benefit/CardRecommendScreen";
+import CardBenefitEditScreen from "../screens/benefit/CardBenefitEditScreen";
 import { useAuthStore } from "../store/authStore";
 import { theme } from "../theme";
 
@@ -29,6 +31,7 @@ const AuthStack = createNativeStackNavigator();
 const MainTab = createBottomTabNavigator();
 const SettingsStack = createNativeStackNavigator();
 const AnalysisStack = createNativeStackNavigator();
+const BenefitStack = createNativeStackNavigator();
 
 function AuthNavigator() {
   return (
@@ -103,6 +106,28 @@ function AnalysisNavigator() {
   );
 }
 
+function BenefitNavigator() {
+  return (
+    <BenefitStack.Navigator>
+      <BenefitStack.Screen
+        name="CardRecommend"
+        component={CardRecommendScreen}
+        options={{ headerShown: false }}
+      />
+      <BenefitStack.Screen
+        name="CardBenefitEdit"
+        component={CardBenefitEditScreen}
+        options={{
+          title: "카드 혜택 관리",
+          headerStyle: { backgroundColor: theme.colors.bg },
+          headerTintColor: theme.colors.primary,
+          headerTitleStyle: { color: theme.colors.text.primary, fontWeight: "700" },
+        }}
+      />
+    </BenefitStack.Navigator>
+  );
+}
+
 function MainNavigator() {
   return (
     <MainTab.Navigator
@@ -122,6 +147,8 @@ function MainNavigator() {
             iconName = focused ? "list" : "list-outline";
           } else if (route.name === "분석") {
             iconName = focused ? "bar-chart" : "bar-chart-outline";
+          } else if (route.name === "혜택") {
+            iconName = focused ? "gift" : "gift-outline";
           } else {
             iconName = focused ? "settings" : "settings-outline";
           }
@@ -131,6 +158,7 @@ function MainNavigator() {
     >
       <MainTab.Screen name="가계부" component={TransactionListScreen} />
       <MainTab.Screen name="분석" component={AnalysisNavigator} />
+      <MainTab.Screen name="혜택" component={BenefitNavigator} />
       <MainTab.Screen name="설정" component={SettingsNavigator} />
     </MainTab.Navigator>
   );

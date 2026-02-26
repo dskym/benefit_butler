@@ -15,6 +15,9 @@ class UserCard(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    catalog_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("card_catalog.id", ondelete="SET NULL"), nullable=True
+    )
     type: Mapped[str] = mapped_column(String(20), nullable=False)  # "credit_card" | "debit_card"
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     monthly_target: Mapped[int | None] = mapped_column(Integer, nullable=True)

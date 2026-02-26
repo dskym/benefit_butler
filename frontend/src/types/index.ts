@@ -71,3 +71,34 @@ export interface PendingMutation {
   createdAt: number;
   retryCount: number;
 }
+
+export interface CardCatalog {
+  id: string;
+  name: string;
+  issuer: string;
+  card_type: "credit_card" | "debit_card";
+  image_url: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface UserCardBenefit {
+  id: string;
+  user_card_id: string;
+  category: string;
+  benefit_type: "cashback" | "points" | "discount" | "free";
+  rate: number | null;
+  flat_amount: number | null;
+  monthly_cap: number | null;
+  min_amount: number | null;
+  created_at: string;
+}
+
+export interface RecommendResult {
+  card_id: string;
+  card_name: string;
+  benefit_type: "cashback" | "points" | "discount" | "free";
+  benefit_description: string;
+  effective_value: number;
+  is_near_target: boolean;
+}

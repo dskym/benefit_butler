@@ -5,8 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.auth import get_current_user
 from app.core.database import get_db
+from app.schemas.card_benefit import RecommendRequest, RecommendResult
 from app.schemas.user_card import CardPerformanceItem, UserCardCreate, UserCardResponse, UserCardUpdate
 import app.services.user_card as card_service
+import app.services.card_recommendation as recommend_service
 
 router = APIRouter(prefix="/cards", tags=["cards"])
 
@@ -53,3 +55,13 @@ def delete_card(
     db: Session = Depends(get_db),
 ):
     card_service.delete_card(db, current_user.id, card_id)
+
+
+@router.post("/recommend", response_model=list[RecommendResult])
+def recommend_cards(
+    data: RecommendRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    amount = data.amount if data.amount is not None else 10000
+    return recommend_service.recommend_cards(db, current_user.id, data.category, amount)
