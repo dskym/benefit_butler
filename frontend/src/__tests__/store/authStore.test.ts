@@ -28,7 +28,13 @@ const mockUser = {
   email: "test@example.com",
   name: "Test User",
   is_active: true,
+  is_email_verified: false,
   created_at: "2026-01-01T00:00:00Z",
+};
+
+const mockVerifiedUser = {
+  ...mockUser,
+  is_email_verified: true,
 };
 
 beforeEach(() => {
@@ -160,5 +166,62 @@ describe("fetchMe offline behavior", () => {
     await useAuthStore.getState().fetchMe();
 
     expect(useAuthStore.getState().user).toBeNull();
+  });
+});
+
+// ─── verifyEmail ──────────────────────────────────────────────────────────────
+
+describe("verifyEmail", () => {
+  it("verifies email and refreshes user with is_email_verified=true", async () => {
+    (apiClient.post as jest.Mock).mockResolvedValueOnce({
+      data: { message: "이메일 인증이 완료되었습니다" },
+    });
+    (apiClient.get as jest.Mock).mockResolvedValueOnce({
+      data: mockVerifiedUser,
+    });
+
+    await useAuthStore.getState().verifyEmail("123456");
+
+    expect(apiClient.post).toHaveBeenCalledWith("/auth/verify-email", {
+      code: "123456",
+    });
+    expect(useAuthStore.getState().user?.is_email_verified).toBe(true);
+    expect(useAuthStore.getState().isLoading).toBe(false);
+  });
+
+  it("resets isLoading and propagates error on failure", async () => {
+    (apiClient.post as jest.Mock).mockRejectedValueOnce(
+      new Error("인증코드가 올바르지 않습니다")
+    );
+
+    await expect(
+      useAuthStore.getState().verifyEmail("000000")
+    ).rejects.toThrow();
+
+    expect(useAuthStore.getState().isLoading).toBe(false);
+  });
+});
+
+// ─── resendVerification ───────────────────────────────────────────────────────
+
+describe("resendVerification", () => {
+  it("calls resend endpoint", async () => {
+    (apiClient.post as jest.Mock).mockResolvedValueOnce({
+      data: { message: "인증코드가 재발송되었습니다" },
+    });
+
+    await useAuthStore.getState().resendVerification();
+
+    expect(apiClient.post).toHaveBeenCalledWith("/auth/resend-verification");
+  });
+
+  it("propagates error on failure", async () => {
+    (apiClient.post as jest.Mock).mockRejectedValueOnce(
+      new Error("429")
+    );
+
+    await expect(
+      useAuthStore.getState().resendVerification()
+    ).rejects.toThrow();
   });
 });
