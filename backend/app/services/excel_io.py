@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from io import BytesIO
 
 import openpyxl
+import xlrd
 from openpyxl.styles import Alignment, Font, PatternFill
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -61,22 +62,53 @@ def auto_detect_mapping(headers: list[str]) -> ColumnMapping:
 # ── Parse and preview ────────────────────────────────────────────────────────
 
 
-def parse_and_preview(file_bytes: bytes) -> ImportPreviewResponse:
-    """Parse an xlsx file and return a preview with auto-detected mapping."""
-    try:
-        wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
-    except Exception:
-        raise HTTPException(status_code=400, detail="올바른 xlsx 파일이 아닙니다.")
-
+def _read_rows_xlsx(file_bytes: bytes) -> list[list]:
+    """Read all rows from an xlsx file."""
+    wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
     ws = wb.active
     if ws is None:
         wb.close()
-        raise HTTPException(status_code=400, detail="빈 엑셀 파일입니다.")
-
-    all_rows: list[list] = []
+        return []
+    rows: list[list] = []
     for row in ws.iter_rows():
-        all_rows.append([cell.value for cell in row])
+        rows.append([cell.value for cell in row])
     wb.close()
+    return rows
+
+
+def _read_rows_xls(file_bytes: bytes) -> list[list]:
+    """Read all rows from an xls (Excel 97-2003) file."""
+    wb = xlrd.open_workbook(file_contents=file_bytes)
+    if wb.nsheets == 0:
+        return []
+    ws = wb.sheet_by_index(0)
+    rows: list[list] = []
+    for row_idx in range(ws.nrows):
+        row_values: list = []
+        for col_idx in range(ws.ncols):
+            cell = ws.cell(row_idx, col_idx)
+            if cell.ctype == xlrd.XL_CELL_DATE:
+                # Convert xlrd date tuple to datetime
+                dt_tuple = xlrd.xldate_as_tuple(cell.value, wb.datemode)
+                row_values.append(datetime(*dt_tuple[:6], tzinfo=timezone.utc))
+            else:
+                row_values.append(cell.value)
+        rows.append(row_values)
+    return rows
+
+
+def parse_and_preview(file_bytes: bytes, filename: str = "") -> ImportPreviewResponse:
+    """Parse an xlsx/xls file and return a preview with auto-detected mapping."""
+    is_xls = filename.lower().endswith(".xls") and not filename.lower().endswith(".xlsx")
+
+    try:
+        if is_xls:
+            all_rows = _read_rows_xls(file_bytes)
+        else:
+            all_rows = _read_rows_xlsx(file_bytes)
+    except Exception:
+        fmt = "xls" if is_xls else "xlsx"
+        raise HTTPException(status_code=400, detail=f"올바른 {fmt} 파일이 아닙니다.")
 
     if len(all_rows) == 0:
         raise HTTPException(status_code=400, detail="빈 엑셀 파일입니다.")

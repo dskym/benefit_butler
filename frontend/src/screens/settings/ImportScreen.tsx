@@ -45,7 +45,10 @@ export default function ImportScreen() {
   const pickFile = useCallback(async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        type: [
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-excel",
+        ],
         copyToCacheDirectory: true,
       });
       if (result.canceled || !result.assets?.[0]) return;
@@ -126,7 +129,7 @@ export default function ImportScreen() {
           />
           <Text style={styles.title}>Excel 파일 가져오기</Text>
           <Text style={styles.subtitle}>
-            은행이나 카드사에서 내보낸{"\n"}.xlsx 파일을 선택해 주세요
+            은행이나 카드사에서 내보낸{"\n"}.xlsx 또는 .xls 파일을 선택해 주세요
           </Text>
           <TouchableOpacity
             style={[styles.primaryButton, step === "uploading" && styles.disabledButton]}

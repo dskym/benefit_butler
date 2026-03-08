@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from io import BytesIO
 
 import openpyxl
+import xlwt
 import pytest
 
 from app.services import import_cache
@@ -16,6 +17,21 @@ def make_xlsx(headers: list[str], rows: list[list]) -> BytesIO:
     ws.append(headers)
     for row in rows:
         ws.append(row)
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def make_xls(headers: list[str], rows: list[list]) -> BytesIO:
+    """Create an in-memory xls (Excel 97-2003) file from headers and rows."""
+    wb = xlwt.Workbook()
+    ws = wb.add_sheet("Sheet1")
+    for col_idx, header in enumerate(headers):
+        ws.write(0, col_idx, header)
+    for row_idx, row in enumerate(rows):
+        for col_idx, value in enumerate(row):
+            ws.write(row_idx + 1, col_idx, value)
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
@@ -105,6 +121,47 @@ class TestImportPreview:
         data = resp.json()
         assert len(data["preview_rows"]) == 10
         assert data["total_rows"] == 20
+
+    def test_xls_korean_headers_auto_detected(self, client, auth_headers):
+        xls = make_xls(
+            ["날짜", "금액", "내역", "구분"],
+            [["2024-01-15", 15000, "스타벅스", "지출"]],
+        )
+        resp = client.post(
+            "/api/v1/transactions/import/preview",
+            files={"file": ("test.xls", xls, "application/vnd.ms-excel")},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_rows"] == 1
+        assert data["auto_mapping"]["transacted_at"] == 0
+        assert data["auto_mapping"]["amount"] == 1
+        assert data["auto_mapping"]["description"] == 2
+
+    def test_xls_confirm_creates_transactions(self, client, auth_headers):
+        xls = make_xls(
+            ["날짜", "금액", "내역"],
+            [["2024-01-15", 15000, "스타벅스"]],
+        )
+        resp = client.post(
+            "/api/v1/transactions/import/preview",
+            files={"file": ("test.xls", xls, "application/vnd.ms-excel")},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        import_id = resp.json()["import_id"]
+
+        resp = client.post(
+            "/api/v1/transactions/import/confirm",
+            json={
+                "import_id": import_id,
+                "mapping": {"transacted_at": 0, "amount": 1, "description": 2},
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201
+        assert resp.json()["created_count"] == 1
 
     def test_reject_non_xlsx(self, client, auth_headers):
         buf = BytesIO(b"not an xlsx file")

@@ -19,16 +19,16 @@ async def import_preview(
     current_user=Depends(get_current_user),
 ):
     """Upload an xlsx file and return a preview with auto-detected column mapping."""
-    if not file.filename or not file.filename.endswith(".xlsx"):
+    if not file.filename or not file.filename.lower().endswith((".xlsx", ".xls")):
         from fastapi import HTTPException
-        raise HTTPException(status_code=400, detail=".xlsx 파일만 지원합니다.")
+        raise HTTPException(status_code=400, detail=".xlsx 또는 .xls 파일만 지원합니다.")
 
     contents = await file.read()
     if len(contents) > MAX_FILE_SIZE:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="파일 크기가 5MB를 초과합니다.")
 
-    return excel_service.parse_and_preview(contents)
+    return excel_service.parse_and_preview(contents, file.filename)
 
 
 @router.post(

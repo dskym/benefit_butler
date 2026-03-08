@@ -71,10 +71,13 @@ export const useExcelImportStore = create<ExcelImportState>()((set, get) => ({
         formData.append("file", blob, fileName);
       } else {
         // Native: use the uri directly
+        const mimeType = fileName.toLowerCase().endsWith(".xls") && !fileName.toLowerCase().endsWith(".xlsx")
+          ? "application/vnd.ms-excel"
+          : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
         formData.append("file", {
           uri: fileUri,
           name: fileName,
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          type: mimeType,
         } as any);
       }
 
