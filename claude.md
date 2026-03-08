@@ -53,6 +53,38 @@ RootNavigation
     └── 설정   → SettingsNavigator (Settings, CategoryList, CardList, Import, Export, PrivacyPolicy)
 ```
 
+## Database Schema
+```
+users
+  id (UUID PK), email (String UNIQUE), hashed_password, name, is_active, is_email_verified, created_at, updated_at
+
+categories
+  id (UUID PK), user_id (FK→users CASCADE), name, type, color, is_default, created_at
+
+transactions
+  id (UUID PK), user_id (FK→users CASCADE), category_id (FK→categories SET NULL),
+  type, amount (Numeric 15,2), description, payment_type, user_card_id (FK→user_cards SET NULL),
+  is_favorite, transacted_at, created_at, updated_at
+
+user_cards
+  id (UUID PK), user_id (FK→users CASCADE), catalog_id (FK→card_catalog SET NULL),
+  type, name, monthly_target (Int), billing_day (Int 1-28), created_at
+
+card_catalog
+  id (UUID PK), name, issuer, card_type, image_url, is_active, created_at
+
+catalog_benefits
+  id (UUID PK), catalog_id (FK→card_catalog CASCADE), category, benefit_type, rate (Float),
+  flat_amount, monthly_cap, min_amount, created_at
+
+user_card_benefits
+  id (UUID PK), user_card_id (FK→user_cards CASCADE), category, benefit_type, rate (Float),
+  flat_amount, monthly_cap, min_amount, created_at
+
+email_verifications
+  id (UUID PK), user_id (FK→users CASCADE), code (String 6), expires_at, attempts, is_used, created_at
+```
+
 ## 주요 아키텍처 결정
 
 ### 오프라인
