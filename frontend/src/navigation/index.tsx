@@ -15,6 +15,7 @@ import { usePushAutoImport } from "../hooks/usePushAutoImport";
 
 import LoginScreen from "../screens/auth/LoginScreen";
 import RegisterScreen from "../screens/auth/RegisterScreen";
+import VerifyEmailScreen from "../screens/auth/VerifyEmailScreen";
 import TransactionListScreen from "../screens/transactions/TransactionListScreen";
 import AnalysisScreen from "../screens/analysis/AnalysisScreen";
 import CardPerformanceScreen from "../screens/analysis/CardPerformanceScreen";
@@ -191,7 +192,12 @@ export default function RootNavigation() {
   return (
     <View style={{ flex: 1, paddingTop: insets.top }}>
       <NavigationContainer>
-        {user !== null ? <MainNavigator /> : <AuthNavigator />}
+        {user !== null
+          ? user.is_email_verified
+            ? <MainNavigator />
+            : <VerifyEmailScreen />
+          : <AuthNavigator />
+        }
       </NavigationContainer>
       <OfflineBanner isOnline={isOnline} isSyncing={isSyncing} pendingCount={pendingCount} />
     </View>

@@ -5,5 +5,6 @@ from app.models.transaction import Transaction
 from app.models.user_card import UserCard
 from app.models.card_catalog import CardCatalog
 from app.models.card_benefit import CatalogBenefit, UserCardBenefit
+from app.models.email_verification import EmailVerification
 
-__all__ = ["User", "Category", "Transaction", "UserCard", "CardCatalog", "CatalogBenefit", "UserCardBenefit"]
+__all__ = ["User", "Category", "Transaction", "UserCard", "CardCatalog", "CatalogBenefit", "UserCardBenefit", "EmailVerification"]

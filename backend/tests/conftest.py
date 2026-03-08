@@ -38,6 +38,11 @@ os.environ["DATABASE_URL"] = _pg.get_connection_url()
 os.environ.setdefault("SECRET_KEY", "test-secret-key-that-is-long-enough-for-hs256")
 os.environ.setdefault("ALGORITHM", "HS256")
 os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
+os.environ.setdefault("SMTP_HOST", "")
+os.environ.setdefault("SMTP_PORT", "587")
+os.environ.setdefault("SMTP_USER", "")
+os.environ.setdefault("SMTP_PASSWORD", "")
+os.environ.setdefault("SMTP_FROM", "test@example.com")
 
 atexit.register(_pg.stop)
 
@@ -85,6 +90,18 @@ USER_PAYLOAD = {
 }
 
 
+def _verify_user_email(email: str) -> None:
+    """DB에서 직접 이메일 인증 처리 (SMTP 없이 테스트)."""
+    from sqlalchemy import select
+    from app.core.database import get_db
+    from app.models.user import User
+    db = next(get_db())
+    user = db.scalar(select(User).where(User.email == email))
+    if user:
+        user.is_email_verified = True
+        db.commit()
+
+
 @pytest.fixture
 def registered_user(client):
     """Register the default test user and return their credentials."""
@@ -95,7 +112,8 @@ def registered_user(client):
 
 @pytest.fixture
 def auth_headers(client, registered_user):
-    """Log in and return the Authorization header dict."""
+    """Log in (with email verified) and return the Authorization header dict."""
+    _verify_user_email(registered_user["email"])
     resp = client.post(
         "/api/v1/auth/login",
         json={"email": registered_user["email"], "password": registered_user["password"]},
@@ -115,6 +133,7 @@ def register_and_login(
         "/api/v1/auth/register",
         json={"email": email, "password": password, "name": name},
     )
+    _verify_user_email(email)
     resp = client.post(
         "/api/v1/auth/login",
         json={"email": email, "password": password},

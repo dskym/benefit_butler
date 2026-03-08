@@ -12,6 +12,8 @@ interface AuthState {
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   fetchMe: () => Promise<void>;
+  verifyEmail: (code: string) => Promise<void>;
+  resendVerification: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -45,6 +47,21 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         await clearToken();
         set({ user: null });
+      },
+
+      verifyEmail: async (code) => {
+        set({ isLoading: true });
+        try {
+          await apiClient.post("/auth/verify-email", { code });
+          const { data: user } = await apiClient.get("/auth/me");
+          set({ user });
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      resendVerification: async () => {
+        await apiClient.post("/auth/resend-verification");
       },
 
       fetchMe: async () => {

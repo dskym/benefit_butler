@@ -21,6 +21,7 @@ def test_register_returns_user_data(client):
     assert body["email"] == "alice@example.com"
     assert body["name"] == "Alice"
     assert body["is_active"] is True
+    assert body["is_email_verified"] is False
     assert "id" in body
     assert "hashed_password" not in body  # password must not be leaked
 

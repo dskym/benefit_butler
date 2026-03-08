@@ -21,6 +21,7 @@
   - SMS Import (Android): `react-native-get-sms-android` (CommonJS 직접 export — `.default` 없이 사용)
   - Push Import (Android): `react-native-notification-listener` (Headless JS 방식 — `addListener` 아님)
 - **Backend**: Python (FastAPI)
+  - Email: `aiosmtplib` (비동기 SMTP — Gmail 앱 비밀번호 인증)
 - **Database**: PostgreSQL (회원 정보, 결제 내역, 카드 메타데이터 관리)
 - **Auth**: JWT 기반 인증 (OAuth2.0 카카오/구글 소셜 로그인 권장)
 - **Parsing**: `xlsx` (Excel), 정규표현식 및 LLM 기반 알림 텍스트 분석
@@ -29,6 +30,7 @@
 
 ### 1. User & Membership (Core)
 - **Authentication**: 이메일 및 소셜 로그인, JWT 기반 토큰 인증
+- **Email Verification**: 회원가입 후 6자리 인증코드 이메일 발송, 인증 완료 전 앱 접근 차단
 - **Profile & Sync**: 사용자별 소비 카테고리 설정, 목표 예산 설정, 기기 간 데이터 실시간 동기화
 
 ### 2. Basic Ledger (Core)
@@ -72,9 +74,9 @@ cd frontend && npm run ios            # iOS dev build (expo run:ios)
 ```
 frontend/src/
 ├── theme.ts                          # 디자인 토큰 (색상/간격/타이포 — 모든 화면이 이 파일 참조)
-├── navigation/index.tsx              # RootNavigation: Auth/Main 분기 + OfflineBanner
+├── navigation/index.tsx              # RootNavigation: Auth/VerifyEmail/Main 3분기 + OfflineBanner
 ├── screens/
-│   ├── auth/        LoginScreen, RegisterScreen
+│   ├── auth/        LoginScreen, RegisterScreen, VerifyEmailScreen
 │   ├── home/        HomeScreen          ← 메인 대시보드 (차트 포함)
 │   ├── transactions/ TransactionListScreen  ← CRUD + 필터/섹션 + 오프라인 지원
 │   ├── analysis/    AnalysisScreen      ← 월별 분석 차트 + 카드별 실적 섹션
@@ -85,7 +87,7 @@ frontend/src/
 │   │                CardListScreen      ← 카드 추가/편집 (monthly_target, billing_day)
 │   └── categories/  CategoryListScreen  ← 설정 탭에서 push 이동
 ├── store/
-│   ├── authStore.ts              # persist + 오프라인 시 캐시 유저 유지
+│   ├── authStore.ts              # persist + 오프라인 시 캐시 유저 유지 + verifyEmail/resendVerification
 │   ├── transactionStore.ts       # persist + 오프라인 낙관적 업데이트 (toggleFavorite 포함)
 │   ├── categoryStore.ts          # persist
 │   ├── cardStore.ts              # 카드 CRUD (billing_day, monthly_target 포함)
@@ -117,7 +119,8 @@ RootNavigation
 ├── AuthNavigator (NativeStack)  — 비로그인
 │   ├── LoginScreen
 │   └── RegisterScreen
-└── MainNavigator (BottomTab 4탭)  — 로그인 후
+├── VerifyEmailScreen              — 로그인 + 이메일 미인증
+└── MainNavigator (BottomTab 4탭)  — 로그인 + 이메일 인증 후
     ├── 가계부  → TransactionListScreen
     ├── 분석    → AnalysisNavigator (NativeStack)
     │               ├── AnalysisMain (AnalysisScreen)
@@ -198,6 +201,7 @@ EXPO_PUBLIC_API_URL=http://localhost:8000   # 백엔드 API 베이스 URL
 | 기능 | 상태 |
 |------|------|
 | 이메일 회원가입 / 로그인 (JWT) | ✅ 완료 |
+| 이메일 인증 (6자리 코드, Gmail SMTP, 5분 쿨다운) | ✅ 완료 |
 | 거래 내역 CRUD | ✅ 완료 |
 | 카테고리 CRUD | ✅ 완료 |
 | 홈 대시보드 (요약 카드 + 차트) | ✅ 완료 |

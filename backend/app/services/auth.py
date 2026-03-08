@@ -17,6 +17,7 @@ def register_user(db: Session, data: UserCreate) -> User:
         email=data.email,
         hashed_password=hash_password(data.password),
         name=data.name,
+        is_email_verified=False,
     )
     db.add(user)
     db.commit()
