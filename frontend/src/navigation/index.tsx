@@ -23,6 +23,8 @@ import SettingsScreen from "../screens/settings/SettingsScreen";
 import CategoryListScreen from "../screens/categories/CategoryListScreen";
 import CardListScreen from "../screens/settings/CardListScreen";
 import PrivacyPolicyScreen from "../screens/settings/PrivacyPolicyScreen";
+import ImportScreen from "../screens/settings/ImportScreen";
+import ExportScreen from "../screens/settings/ExportScreen";
 import CardRecommendScreen from "../screens/benefit/CardRecommendScreen";
 import CardBenefitEditScreen from "../screens/benefit/CardBenefitEditScreen";
 import { useAuthStore } from "../store/authStore";
@@ -76,6 +78,26 @@ function SettingsNavigator() {
         component={PrivacyPolicyScreen}
         options={{
           title: "개인정보 처리방침",
+          headerStyle: { backgroundColor: theme.colors.bg },
+          headerTintColor: theme.colors.primary,
+          headerTitleStyle: { color: theme.colors.text.primary, fontWeight: "700" },
+        }}
+      />
+      <SettingsStack.Screen
+        name="Import"
+        component={ImportScreen}
+        options={{
+          title: "Excel 가져오기",
+          headerStyle: { backgroundColor: theme.colors.bg },
+          headerTintColor: theme.colors.primary,
+          headerTitleStyle: { color: theme.colors.text.primary, fontWeight: "700" },
+        }}
+      />
+      <SettingsStack.Screen
+        name="Export"
+        component={ExportScreen}
+        options={{
+          title: "Excel 내보내기",
           headerStyle: { backgroundColor: theme.colors.bg },
           headerTintColor: theme.colors.primary,
           headerTitleStyle: { color: theme.colors.text.primary, fontWeight: "700" },

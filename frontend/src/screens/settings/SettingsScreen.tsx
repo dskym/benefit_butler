@@ -137,6 +137,29 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      {/* 데이터 섹션 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>데이터</Text>
+        <View style={styles.sectionCard}>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => navigation.navigate("Import")}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.rowLabel}>Excel 가져오기</Text>
+            <Text style={styles.rowChevron}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.row, styles.rowLast]}
+            onPress={() => navigation.navigate("Export")}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.rowLabel}>Excel 내보내기</Text>
+            <Text style={styles.rowChevron}>›</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* 데이터 동기화 섹션 */}
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>데이터 동기화</Text>
