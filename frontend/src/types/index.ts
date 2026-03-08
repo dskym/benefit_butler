@@ -5,6 +5,7 @@ export interface User {
   email: string;
   name: string;
   is_active: boolean;
+  is_email_verified: boolean;
   created_at: string;
 }
 
