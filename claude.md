@@ -24,7 +24,9 @@
   - Email: `aiosmtplib` (비동기 SMTP — Gmail 앱 비밀번호 인증)
 - **Database**: PostgreSQL (회원 정보, 결제 내역, 카드 메타데이터 관리)
 - **Auth**: JWT 기반 인증 (OAuth2.0 카카오/구글 소셜 로그인 권장)
-- **Parsing**: `xlsx` (Excel), 정규표현식 및 LLM 기반 알림 텍스트 분석
+- **Excel**: `openpyxl` (XLSX 읽기/쓰기) + `xlrd` (XLS 97-2003 읽기)
+- **Parsing**: 정규표현식 및 LLM 기반 알림 텍스트 분석
+- **File Picker**: `expo-document-picker` (네이티브/웹 파일 선택)
 
 ## 📋 Core Features
 
@@ -77,7 +79,7 @@ frontend/src/
 ├── navigation/index.tsx              # RootNavigation: Auth/VerifyEmail/Main 3분기 + OfflineBanner
 ├── screens/
 │   ├── auth/        LoginScreen, RegisterScreen, VerifyEmailScreen
-│   ├── home/        HomeScreen          ← 메인 대시보드 (차트 포함)
+│   ├── dashboard/   DashboardScreen     ← 메인 대시보드 (차트 포함)
 │   ├── transactions/ TransactionListScreen  ← CRUD + 필터/섹션 + 오프라인 지원
 │   ├── analysis/    AnalysisScreen      ← 월별 분석 차트 + 카드별 실적 섹션
 │   │                CardPerformanceScreen ← 카드 상세 실적 + 기간별 거래 목록
@@ -85,6 +87,9 @@ frontend/src/
 │   │                CardBenefitEditScreen ← 카드 혜택 CRUD (카탈로그 연동)
 │   ├── settings/    SettingsScreen      ← 프로필 + 설정
 │   │                CardListScreen      ← 카드 추가/편집 (monthly_target, billing_day)
+│   │                ImportScreen        ← Excel 가져오기 (파일 업로드 + 컬럼 매핑)
+│   │                ExportScreen        ← Excel 내보내기 (기간별 거래 내역 다운로드)
+│   │                PrivacyPolicyScreen ← 개인정보 처리방침
 │   └── categories/  CategoryListScreen  ← 설정 탭에서 push 이동
 ├── store/
 │   ├── authStore.ts              # persist + 오프라인 시 캐시 유저 유지 + verifyEmail/resendVerification
@@ -94,6 +99,7 @@ frontend/src/
 │   ├── cardPerformanceStore.ts   # persist + GET /cards/performance 캐싱 (오프라인 stale 유지)
 │   ├── cardBenefitStore.ts       # persist + 카드별 혜택 CRUD (user_card_benefits)
 │   ├── recommendStore.ts         # 카드 추천 결과 (persist 없음, 매회 재계산)
+│   ├── excelImportStore.ts       # Excel 가져오기 워크플로우 (upload → preview → confirm)
 │   ├── financialImportStore.ts   # SMS/푸시 임포트 상태 (isSmsEnabled, isPushEnabled, dedup, persist)
 │   ├── pendingMutationsStore.ts  # 오프라인 FIFO 큐 (MMKV 영속) + retryCount + incrementRetry
 │   └── syncStatusStore.ts        # 동기화 상태 (isSyncing, lastSyncAt persist, syncError)
@@ -108,7 +114,8 @@ frontend/src/
 │   └── headlessNotificationHandler.ts  # Android Headless JS: 알림 파싱 → AsyncStorage 저장
 ├── utils/
 │   ├── smsParser.ts              # parseFinancialMessage() + buildDedupKey() — SMS/푸시 공용
-│   └── financialAppPackages.ts   # 금융앱 패키지명 화이트리스트
+│   ├── financialAppPackages.ts   # 금융앱 패키지명 화이트리스트
+│   └── categoryKeywords.ts       # 가맹점 키워드 기반 카테고리 자동 분류 (suggestCategory)
 ├── components/OfflineBanner.tsx  # 오프라인(주황)/동기화 중(파랑) 두 상태 구분 배너
 └── types/index.ts                # User, Category, Transaction, PendingMutation 인터페이스
 ```
@@ -132,7 +139,9 @@ RootNavigation
                     ├── SettingsScreen
                     ├── CategoryListScreen
                     ├── CardListScreen
-                    └── PrivacyPolicyScreen
+                    ├── PrivacyPolicyScreen
+                    ├── ImportScreen          ← Excel 가져오기
+                    └── ExportScreen          ← Excel 내보내기
 ```
 
 ### 오프라인 아키텍처
@@ -185,6 +194,45 @@ RootNavigation
 - `react-native-get-sms-android`는 CommonJS export — `require()` 직접 사용, `.default` 없음
 - Android 10+ `adb shell content insert`로 SMS inbox 직접 삽입 불가 (권한 차단)
 
+### Excel 가져오기/내보내기 아키텍처
+
+#### 지원 형식
+- `.xlsx` (Office Open XML) — `openpyxl`로 처리
+- `.xls` (Excel 97-2003) — `xlrd`로 처리
+- 파일 크기 제한: 5MB
+
+#### 가져오기 워크플로우 (3단계)
+1. **업로드 & 미리보기** (`POST /transactions/import/preview`)
+   - 파일 업로드 → 헤더 자동 감지 → 컬럼 매핑 자동 추천
+   - 첫 10행 미리보기 + 총 행 수 반환
+   - `import_cache`에 임시 저장 (세션 기반)
+2. **매핑 확인** (프론트엔드)
+   - 자동 매핑 결과 확인/수정 UI
+   - 필수 필드: `transacted_at`, `amount` (나머지 선택)
+3. **확정 & 생성** (`POST /transactions/import/confirm`)
+   - 매핑 기반 거래 생성 + 중복 검사 (날짜+금액+내역 해시)
+   - 행별 에러 리포팅 (`created_count`, `duplicate_count`, `error_count`)
+
+#### 내보내기 (`GET /transactions/export`)
+- 기간 필터: 월별 / 연별 / 전체
+- 서식 포함 XLSX 파일 생성 (openpyxl 스타일링)
+
+#### 헤더 자동 매핑 패턴
+| 필드 | 인식 패턴 |
+|------|-----------|
+| `transacted_at` | 날짜, date, 일시, 거래일, 결제일, 사용일 |
+| `amount` | 금액, amount, 결제금액, 거래금액, 사용금액 |
+| `description` | 내역, description, 적요, 가맹점, 사용처 |
+| `type` | 유형, type, 거래유형, 구분, 입출금 |
+| `category_name` | 카테고리, category, 분류, 항목 |
+| `payment_type` | 결제수단, payment, 결제방법 |
+| `card_name` | 카드, card, 카드명 |
+
+#### 프론트엔드 Store (`excelImportStore.ts`)
+- `step`: `idle` → `uploading` → `preview` → `confirming` → `done` | `error`
+- Web/Native 플랫폼별 FormData 처리 분기 (blob vs uri)
+- persist 미사용 (일회성 워크플로우)
+
 ### 디자인 시스템
 - **Primary**: `#3182F6` (토스 블루)
 - **Income**: `#22C55E` / **Expense**: `#F04452` / **Transfer**: `#8B95A1`
@@ -210,7 +258,7 @@ EXPO_PUBLIC_API_URL=http://localhost:8000   # 백엔드 API 베이스 URL
 | AI 자동 카테고리 분류 (가맹점명 기반) | ✅ 완료 |
 | 오프라인 지원 (MMKV 캐싱 + 낙관적 업데이트 + 펜딩 큐 자동 동기화) | ✅ 완료 |
 | 오프라인 퍼스트 완성 (재시도 전략 + toggleFavorite 오프라인 + 동기화 상태 UI + 카테고리 가드) | ✅ 완료 |
-| Excel 업로드 자동 파싱 | ⬜ 미구현 |
+| Excel 가져오기/내보내기 (.xlsx, .xls 지원 + 컬럼 자동 매핑 + 중복 검사) | ✅ 완료 |
 | SMS/푸시 실시간 파싱 (Android) | ✅ 완료 |
 | 카드 실적 트래커 (billing_day 기반 집계 기간 + 상세 화면) | ✅ 완료 |
 | 카드 추천 알고리즘 (카탈로그 + 혜택 CRUD + 가맹점별 최적 카드 추천) | ✅ 완료 |
@@ -233,6 +281,7 @@ cd frontend && npm test -- --watchAll=false  # CI 모드
   - `__tests__/services/` — API 서비스 단위 테스트
   - `__tests__/storage/` — Storage 추상화 단위 테스트
   - `__tests__/hooks/` — Custom hook 단위 테스트 (`renderHook` 사용)
+  - `__tests__/utils/` — 유틸리티 함수 단위 테스트
 - **원칙**:
   - Store 테스트 시 `apiClient`를 `jest.mock('../../services/api')`로 완전히 모킹
   - `persist` middleware 사용 store 테스트 시 `createPlatformStorage` 추가 모킹 필수:
