@@ -17,6 +17,8 @@ depends_on = None
 def upgrade() -> None:
     # 기존 유저는 true(영향 없음), 신규 가입은 코드에서 False 설정
     op.add_column("users", sa.Column("is_email_verified", sa.Boolean(), nullable=False, server_default=sa.text("true")))
+    # 백필 완료 후 server_default 제거 — 모델의 default=False와 일치시킴
+    op.alter_column("users", "is_email_verified", server_default=None)
 
     op.create_table(
         "email_verifications",
