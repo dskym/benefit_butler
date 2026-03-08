@@ -79,6 +79,8 @@ frontend/src/
 │   ├── transactions/ TransactionListScreen  ← CRUD + 필터/섹션 + 오프라인 지원
 │   ├── analysis/    AnalysisScreen      ← 월별 분석 차트 + 카드별 실적 섹션
 │   │                CardPerformanceScreen ← 카드 상세 실적 + 기간별 거래 목록
+│   ├── benefit/     CardRecommendScreen  ← 가맹점별 최적 카드 추천
+│   │                CardBenefitEditScreen ← 카드 혜택 CRUD (카탈로그 연동)
 │   ├── settings/    SettingsScreen      ← 프로필 + 설정
 │   │                CardListScreen      ← 카드 추가/편집 (monthly_target, billing_day)
 │   └── categories/  CategoryListScreen  ← 설정 탭에서 push 이동
@@ -88,6 +90,8 @@ frontend/src/
 │   ├── categoryStore.ts          # persist
 │   ├── cardStore.ts              # 카드 CRUD (billing_day, monthly_target 포함)
 │   ├── cardPerformanceStore.ts   # persist + GET /cards/performance 캐싱 (오프라인 stale 유지)
+│   ├── cardBenefitStore.ts       # persist + 카드별 혜택 CRUD (user_card_benefits)
+│   ├── recommendStore.ts         # 카드 추천 결과 (persist 없음, 매회 재계산)
 │   ├── financialImportStore.ts   # SMS/푸시 임포트 상태 (isSmsEnabled, isPushEnabled, dedup, persist)
 │   ├── pendingMutationsStore.ts  # 오프라인 FIFO 큐 (MMKV 영속) + retryCount + incrementRetry
 │   └── syncStatusStore.ts        # 동기화 상태 (isSyncing, lastSyncAt persist, syncError)
@@ -113,11 +117,14 @@ RootNavigation
 ├── AuthNavigator (NativeStack)  — 비로그인
 │   ├── LoginScreen
 │   └── RegisterScreen
-└── MainNavigator (BottomTab 3탭)  — 로그인 후
+└── MainNavigator (BottomTab 4탭)  — 로그인 후
     ├── 가계부  → TransactionListScreen
     ├── 분석    → AnalysisNavigator (NativeStack)
     │               ├── AnalysisMain (AnalysisScreen)
     │               └── CardPerformance (CardPerformanceScreen)
+    ├── 혜택    → BenefitNavigator (NativeStack)
+    │               ├── CardRecommend (CardRecommendScreen)
+    │               └── CardBenefitEdit (CardBenefitEditScreen)
     └── 설정    → SettingsNavigator (NativeStack)
                     ├── SettingsScreen
                     ├── CategoryListScreen
@@ -202,7 +209,7 @@ EXPO_PUBLIC_API_URL=http://localhost:8000   # 백엔드 API 베이스 URL
 | Excel 업로드 자동 파싱 | ⬜ 미구현 |
 | SMS/푸시 실시간 파싱 (Android) | ✅ 완료 |
 | 카드 실적 트래커 (billing_day 기반 집계 기간 + 상세 화면) | ✅ 완료 |
-| 카드 추천 알고리즘 | ⬜ 미구현 |
+| 카드 추천 알고리즘 (카탈로그 + 혜택 CRUD + 가맹점별 최적 카드 추천) | ✅ 완료 |
 | 소셜 로그인 (카카오/구글) | ⬜ 미구현 |
 
 ## 🧪 Testing
