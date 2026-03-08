@@ -14,7 +14,7 @@ from app.services.email import get_email_service
 VERIFY_CODE_LENGTH = 6
 VERIFY_CODE_EXPIRY_MINUTES = 10
 VERIFY_MAX_ATTEMPTS = 5
-RESEND_COOLDOWN_SECONDS = 60
+RESEND_COOLDOWN_SECONDS = 300
 
 
 def _generate_code() -> str:

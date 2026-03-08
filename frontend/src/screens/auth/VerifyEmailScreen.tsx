@@ -14,7 +14,7 @@ import {
 import { useAuthStore } from "../../store/authStore";
 import { theme } from "../../theme";
 
-const COOLDOWN_SECONDS = 60;
+const COOLDOWN_SECONDS = 300;
 
 export default function VerifyEmailScreen() {
   const [code, setCode] = useState("");
