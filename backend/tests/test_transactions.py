@@ -341,3 +341,75 @@ def test_delete_transaction_not_found_returns_404(client, auth_headers):
     fake_id = "00000000-0000-0000-0000-000000000000"
     resp = client.delete(f"/api/v1/transactions/{fake_id}", headers=auth_headers)
     assert resp.status_code == 404
+
+
+# ── edge cases (documents current behavior) ─────────────────────────────────
+
+
+def test_create_transaction_with_zero_amount(client, auth_headers):
+    """amount=0 -- documents current behavior."""
+    resp = client.post(
+        "/api/v1/transactions/",
+        headers=auth_headers,
+        json={**TX_PAYLOAD, "amount": "0"},
+    )
+    # Currently no validation prevents 0 amount
+    assert resp.status_code == 201
+    assert float(resp.json()["amount"]) == 0.0
+
+
+def test_create_transaction_with_negative_amount(client, auth_headers):
+    """Negative amount -- documents current behavior."""
+    resp = client.post(
+        "/api/v1/transactions/",
+        headers=auth_headers,
+        json={**TX_PAYLOAD, "amount": "-5000"},
+    )
+    assert resp.status_code == 201
+    assert float(resp.json()["amount"]) == -5000.0
+
+
+def test_create_transaction_with_large_amount(client, auth_headers):
+    """Very large amount is accepted."""
+    resp = client.post(
+        "/api/v1/transactions/",
+        headers=auth_headers,
+        json={**TX_PAYLOAD, "amount": "999999999999"},
+    )
+    assert resp.status_code == 201
+
+
+def test_create_transaction_with_invalid_type(client, auth_headers):
+    """Invalid type string -- documents current behavior (no enum validation)."""
+    resp = client.post(
+        "/api/v1/transactions/",
+        headers=auth_headers,
+        json={**TX_PAYLOAD, "type": "invalid_type"},
+    )
+    # Currently no validation on type field (plain str); accepted as-is
+    assert resp.status_code == 201
+
+
+def test_filter_from_greater_than_to_returns_empty(client, auth_headers):
+    """from > to date range returns empty results."""
+    create_tx(client, auth_headers)
+    resp = client.get(
+        "/api/v1/transactions/?from=2026-12-31&to=2026-01-01",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_update_transaction_with_empty_body_preserves_data(client, auth_headers):
+    """PUT with empty body does not alter existing values."""
+    created = create_tx(client, auth_headers)
+    resp = client.put(
+        f"/api/v1/transactions/{created['id']}",
+        headers=auth_headers,
+        json={},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert float(body["amount"]) == float(created["amount"])
+    assert body["description"] == created["description"]

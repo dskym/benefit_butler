@@ -121,6 +121,71 @@ describe("recommend", () => {
 
     expect(result.current.results).toEqual([]);
   });
+
+  it("propagates API error to caller (no internal catch)", async () => {
+    const apiError = new Error("Network error");
+    apiClient.post.mockRejectedValueOnce(apiError);
+
+    const { result } = renderHook(() => useRecommendStore());
+    await expect(
+      act(async () => {
+        await result.current.recommend("test", 1000, null);
+      })
+    ).rejects.toThrow("Network error");
+  });
+
+  it("preserves existing results and lastQuery on error", async () => {
+    useRecommendStore.setState({
+      results: MOCK_RESULTS,
+      lastQuery: { merchantName: "스타벅스", amount: 10000, category: "식비" },
+      isLoading: false,
+    });
+    apiClient.post.mockRejectedValueOnce(new Error("fail"));
+
+    const { result } = renderHook(() => useRecommendStore());
+    await act(async () => {
+      await result.current.recommend("test", 1000, null).catch(() => {});
+    });
+
+    expect(result.current.results).toEqual(MOCK_RESULTS);
+    expect(result.current.lastQuery).toEqual({
+      merchantName: "스타벅스",
+      amount: 10000,
+      category: "식비",
+    });
+  });
+
+  it("overwrites lastQuery on each successful call", async () => {
+    apiClient.post.mockResolvedValueOnce({ data: MOCK_RESULTS });
+
+    const { result } = renderHook(() => useRecommendStore());
+    await act(async () => {
+      await result.current.recommend("first", 1000, null);
+    });
+    expect(result.current.lastQuery?.merchantName).toBe("first");
+
+    apiClient.post.mockResolvedValueOnce({ data: [] });
+    await act(async () => {
+      await result.current.recommend("second", 2000, "쇼핑");
+    });
+    expect(result.current.lastQuery).toEqual({
+      merchantName: "second",
+      amount: 2000,
+      category: "쇼핑",
+    });
+  });
+
+  it("does not include category key in body when category is null", async () => {
+    apiClient.post.mockResolvedValueOnce({ data: [] });
+
+    const { result } = renderHook(() => useRecommendStore());
+    await act(async () => {
+      await result.current.recommend("test", 1000, null);
+    });
+
+    const sentBody = apiClient.post.mock.calls[0][1];
+    expect(Object.keys(sentBody)).not.toContain("category");
+  });
 });
 
 // ── clear ─────────────────────────────────────────────────────────────────────

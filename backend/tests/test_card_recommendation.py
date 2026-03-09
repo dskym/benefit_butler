@@ -306,3 +306,110 @@ def test_recommend_default_amount_when_not_provided(client, auth_headers):
     results = resp.json()
     # 1% of 10000 = 100
     assert results[0]["effective_value"] == 100
+
+
+# ── edge cases ───────────────────────────────────────────────────────────────
+
+
+def test_recommend_flat_amount_discount(client, auth_headers):
+    """flat_amount discount benefit -> exact effective_value."""
+    card = _create_user_card(client, auth_headers, {"type": "credit_card", "name": "할인카드"})
+    _add_benefit(client, auth_headers, card["id"], {
+        "category": "전체",
+        "benefit_type": "discount",
+        "flat_amount": 2000,
+    })
+    results = _recommend(client, auth_headers, amount=10000, category=None)
+    assert len(results) == 1
+    assert results[0]["effective_value"] == 2000
+
+
+def test_recommend_flat_amount_with_monthly_cap(client, auth_headers):
+    """flat_amount + monthly_cap applied."""
+    card = _create_user_card(client, auth_headers, {"type": "credit_card", "name": "캡카드"})
+    _add_benefit(client, auth_headers, card["id"], {
+        "category": "전체",
+        "benefit_type": "discount",
+        "flat_amount": 5000,
+        "monthly_cap": 3000,
+    })
+    results = _recommend(client, auth_headers, amount=10000, category=None)
+    assert results[0]["effective_value"] == 3000
+
+
+def test_recommend_amount_zero_returns_empty(client, auth_headers):
+    """amount=0 -> no benefit value -> no results."""
+    card = _create_user_card(client, auth_headers, {"type": "credit_card", "name": "제로카드"})
+    _add_benefit(client, auth_headers, card["id"], {
+        "category": "전체",
+        "benefit_type": "cashback",
+        "rate": 5.0,
+    })
+    results = _recommend(client, auth_headers, amount=0, category=None)
+    assert results == []
+
+
+def test_recommend_tiebreak_by_performance_bonus(client, auth_headers):
+    """Same effective_value -> card with performance_bonus ranks higher."""
+    from datetime import date
+
+    card_near = _create_user_card(client, auth_headers, {
+        "type": "credit_card", "name": "실적임박",
+        "monthly_target": 100000, "billing_day": None,
+    })
+    card_far = _create_user_card(client, auth_headers, {
+        "type": "credit_card", "name": "여유",
+        "monthly_target": 1000000, "billing_day": None,
+    })
+
+    # Same rate -> same effective_value
+    _add_benefit(client, auth_headers, card_near["id"], {
+        "category": "전체", "benefit_type": "cashback", "rate": 1.0,
+    })
+    _add_benefit(client, auth_headers, card_far["id"], {
+        "category": "전체", "benefit_type": "cashback", "rate": 1.0,
+    })
+
+    # card_near: spend 95k -> remaining 5% -> near target
+    today = date.today()
+    mid = today.replace(day=min(today.day, 15))
+    client.post("/api/v1/transactions/", headers=auth_headers, json={
+        "type": "expense", "amount": 95000,
+        "transacted_at": f"{mid}T10:00:00+00:00",
+        "user_card_id": card_near["id"],
+    })
+
+    results = _recommend(client, auth_headers, amount=10000, category=None)
+    assert len(results) == 2
+    assert results[0]["card_name"] == "실적임박"
+    assert results[0]["is_near_target"] is True
+
+
+def test_recommend_rate_preferred_for_cashback(client, auth_headers):
+    """For cashback, rate-based calculation is used (not flat_amount)."""
+    card = _create_user_card(client, auth_headers, {"type": "credit_card", "name": "레이트카드"})
+    _add_benefit(client, auth_headers, card["id"], {
+        "category": "전체",
+        "benefit_type": "cashback",
+        "rate": 5.0,
+        "flat_amount": 100,
+    })
+    # cashback uses rate: 10000 * 5% = 500, not flat_amount
+    results = _recommend(client, auth_headers, amount=10000, category=None)
+    assert results[0]["effective_value"] == 500
+
+
+def test_recommend_best_benefit_selected_per_card(client, auth_headers):
+    """Multiple benefits on same card -> highest value selected."""
+    card = _create_user_card(client, auth_headers, {"type": "credit_card", "name": "복수혜택카드"})
+    _add_benefit(client, auth_headers, card["id"], {
+        "category": "전체", "benefit_type": "cashback", "rate": 1.0,
+    })
+    _add_benefit(client, auth_headers, card["id"], {
+        "category": "식비", "benefit_type": "cashback", "rate": 5.0,
+    })
+
+    results = _recommend(client, auth_headers, amount=10000, category="식비")
+    assert len(results) == 1
+    # Should pick 식비 5% = 500, not 전체 1% = 100
+    assert results[0]["effective_value"] == 500
