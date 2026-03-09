@@ -135,7 +135,8 @@ export default function ImportScreen() {
             style={[styles.primaryButton, step === "uploading" && styles.disabledButton]}
             onPress={pickFile}
             disabled={step === "uploading"}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
+            accessibilityLabel="파일 선택"
           >
             {step === "uploading" ? (
               <ActivityIndicator color="#fff" />
@@ -163,7 +164,8 @@ export default function ImportScreen() {
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={reset}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
+            accessibilityLabel="다시 시도"
           >
             <Text style={styles.primaryButtonText}>다시 시도</Text>
           </TouchableOpacity>
@@ -208,7 +210,8 @@ export default function ImportScreen() {
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={handleDone}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
+            accessibilityLabel="완료"
           >
             <Text style={styles.primaryButtonText}>완료</Text>
           </TouchableOpacity>
@@ -239,6 +242,7 @@ export default function ImportScreen() {
                     style={[styles.tableCell, styles.headerCell]}
                     onPress={() => cycleMapping(i)}
                     activeOpacity={0.7}
+                    accessibilityLabel={`컬럼 매핑: ${h}`}
                   >
                     <Text style={styles.headerText} numberOfLines={1}>
                       {h}
@@ -306,7 +310,8 @@ export default function ImportScreen() {
           ]}
           onPress={handleConfirm}
           disabled={step === "confirming"}
-          activeOpacity={0.8}
+          activeOpacity={0.7}
+          accessibilityLabel="가져오기"
         >
           {step === "confirming" ? (
             <ActivityIndicator color="#fff" />

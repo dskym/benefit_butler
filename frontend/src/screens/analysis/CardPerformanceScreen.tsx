@@ -51,7 +51,9 @@ export default function CardPerformanceScreen() {
   if (!item) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emptyText}>데이터를 불러올 수 없습니다.</Text>
+        <Text style={{ fontSize: 48, marginBottom: 16 }}>⚠️</Text>
+        <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.secondary, marginBottom: 8, textAlign: 'center' }}>데이터 로드 실패</Text>
+        <Text style={{ fontSize: 14, color: theme.colors.text.hint, textAlign: 'center', lineHeight: 20 }}>데이터를 불러올 수 없습니다.</Text>
       </View>
     );
   }
@@ -119,7 +121,11 @@ export default function CardPerformanceScreen() {
         {isLoading ? (
           <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 20 }} />
         ) : transactions.length === 0 ? (
-          <Text style={styles.emptyText}>이 기간에 이 카드로 결제한 내역이 없습니다.</Text>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 }}>
+            <Text style={{ fontSize: 48, marginBottom: 16 }}>💳</Text>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.secondary, marginBottom: 8, textAlign: 'center' }}>결제 내역 없음</Text>
+            <Text style={{ fontSize: 14, color: theme.colors.text.hint, textAlign: 'center', lineHeight: 20 }}>이 기간에 이 카드로 결제한 내역이 없습니다.</Text>
+          </View>
         ) : (
           transactions.map((tx) => (
             <View key={tx.id} style={styles.txItem}>
@@ -152,6 +158,11 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   cardHeader: {
     flexDirection: "row",
@@ -224,10 +235,4 @@ const styles = StyleSheet.create({
   txDate: { fontSize: 12, color: theme.colors.text.hint, marginTop: 2 },
   txAmount: { fontSize: 15, fontWeight: "700" },
 
-  emptyText: {
-    fontSize: 14,
-    color: theme.colors.text.hint,
-    textAlign: "center",
-    paddingVertical: theme.spacing.md,
-  },
 });

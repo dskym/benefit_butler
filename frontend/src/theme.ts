@@ -1,4 +1,6 @@
 // frontend/src/theme.ts
+import { Platform } from "react-native";
+
 export const theme = {
   colors: {
     bg: "#FFFFFF",
@@ -12,6 +14,12 @@ export const theme = {
       primary: "#191F28",
       secondary: "#6B7684",
       hint: "#B0B8C1",
+    },
+    semantic: {
+      success: "#22C55E",
+      warning: "#F59E0B",
+      error: "#F04452",
+      info: "#3182F6",
     },
   },
   spacing: {
@@ -32,5 +40,62 @@ export const theme = {
     h2: { fontSize: 20, fontWeight: "700" as const },
     body: { fontSize: 16 },
     caption: { fontSize: 13 },
+  },
+  shadow: {
+    sm: Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+      },
+      android: { elevation: 1 },
+      default: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+      },
+    })!,
+    md: Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: { elevation: 3 },
+      default: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+    })!,
+    lg: Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: { elevation: 6 },
+      default: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+    })!,
+  },
+  opacity: {
+    disabled: 0.4,
+    pressed: 0.7,
+    overlay: 0.4,
+  },
+  animation: {
+    fast: 150,
+    normal: 250,
+    slow: 400,
   },
 } as const;

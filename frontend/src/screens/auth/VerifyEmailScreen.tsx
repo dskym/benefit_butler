@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { useAuthStore } from "../../store/authStore";
+import { useToastStore } from "../../store/toastStore";
 import { theme } from "../../theme";
 
 const COOLDOWN_SECONDS = 300;
@@ -61,7 +62,7 @@ export default function VerifyEmailScreen() {
     try {
       await resendVerification();
       startCooldown();
-      Alert.alert("발송 완료", "인증코드가 재발송되었습니다.");
+      useToastStore.getState().showToast("인증코드가 재발송되었습니다.");
     } catch (error: any) {
       const message = error.response?.data?.detail ?? "재발송에 실패했습니다.";
       Alert.alert("재발송 실패", message);
@@ -89,12 +90,14 @@ export default function VerifyEmailScreen() {
           onChangeText={setCode}
           editable={!isLoading}
           textAlign="center"
+          accessibilityLabel="인증코드 입력"
         />
 
         <TouchableOpacity
           style={[styles.button, isLoading && styles.buttonDisabled]}
           onPress={handleVerify}
           disabled={isLoading}
+          accessibilityLabel="인증하기"
         >
           {isLoading ? (
             <ActivityIndicator color="#fff" />
@@ -107,6 +110,7 @@ export default function VerifyEmailScreen() {
           onPress={handleResend}
           disabled={cooldown > 0}
           style={styles.resendButton}
+          accessibilityLabel="인증코드 재발송"
         >
           <Text
             style={[styles.resendText, cooldown > 0 && styles.resendDisabled]}
@@ -117,7 +121,7 @@ export default function VerifyEmailScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+        <TouchableOpacity onPress={logout} style={styles.logoutButton} accessibilityLabel="로그아웃">
           <Text style={styles.logoutText}>로그아웃</Text>
         </TouchableOpacity>
       </View>

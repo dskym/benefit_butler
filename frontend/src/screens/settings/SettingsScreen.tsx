@@ -122,6 +122,7 @@ export default function SettingsScreen() {
             style={styles.row}
             onPress={() => navigation.navigate("CategoryList")}
             activeOpacity={0.7}
+            accessibilityLabel="카테고리 관리"
           >
             <Text style={styles.rowLabel}>카테고리 관리</Text>
             <Text style={styles.rowChevron}>›</Text>
@@ -130,6 +131,7 @@ export default function SettingsScreen() {
             style={[styles.row, styles.rowLast]}
             onPress={() => navigation.navigate("CardList")}
             activeOpacity={0.7}
+            accessibilityLabel="카드 관리"
           >
             <Text style={styles.rowLabel}>카드 관리</Text>
             <Text style={styles.rowChevron}>›</Text>
@@ -145,6 +147,7 @@ export default function SettingsScreen() {
             style={styles.row}
             onPress={() => navigation.navigate("Import")}
             activeOpacity={0.7}
+            accessibilityLabel="Excel 가져오기"
           >
             <Text style={styles.rowLabel}>Excel 가져오기</Text>
             <Text style={styles.rowChevron}>›</Text>
@@ -153,6 +156,7 @@ export default function SettingsScreen() {
             style={[styles.row, styles.rowLast]}
             onPress={() => navigation.navigate("Export")}
             activeOpacity={0.7}
+            accessibilityLabel="Excel 내보내기"
           >
             <Text style={styles.rowLabel}>Excel 내보내기</Text>
             <Text style={styles.rowChevron}>›</Text>
@@ -187,6 +191,7 @@ export default function SettingsScreen() {
             onPress={() => syncService.flush()}
             disabled={!isOnline || pendingCount === 0 || isSyncing}
             activeOpacity={0.7}
+            accessibilityLabel="지금 동기화"
           >
             <Text style={styles.syncButtonText}>
               {isSyncing ? '동기화 중...' : '지금 동기화'}
@@ -207,6 +212,7 @@ export default function SettingsScreen() {
             style={[styles.row, styles.rowLast]}
             onPress={() => navigation.navigate("PrivacyPolicy")}
             activeOpacity={0.7}
+            accessibilityLabel="개인정보 처리방침"
           >
             <Text style={styles.rowLabel}>개인정보 처리방침</Text>
             <Text style={styles.rowChevron}>›</Text>
@@ -215,7 +221,7 @@ export default function SettingsScreen() {
       </View>
 
       {/* 로그아웃 버튼 */}
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.7} accessibilityLabel="로그아웃">
         <Text style={styles.logoutText}>로그아웃</Text>
       </TouchableOpacity>
     </ScrollView>

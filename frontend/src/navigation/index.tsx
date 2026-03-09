@@ -8,6 +8,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import { OfflineBanner } from "../components/OfflineBanner";
+import { Toast } from "../components/Toast";
 import { useSyncStatusStore } from "../store/syncStatusStore";
 import { usePendingMutationsStore } from "../store/pendingMutationsStore";
 import { useSmsAutoImport } from "../hooks/useSmsAutoImport";
@@ -222,6 +223,7 @@ export default function RootNavigation() {
         }
       </NavigationContainer>
       <OfflineBanner isOnline={isOnline} isSyncing={isSyncing} pendingCount={pendingCount} />
+      <Toast />
     </View>
   );
 }

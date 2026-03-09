@@ -1,6 +1,7 @@
 // frontend/src/screens/analysis/AnalysisScreen.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -76,6 +77,16 @@ export default function AnalysisScreen({ navigation }: { navigation?: any }) {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth()); // 0-based
   const [selectedDay, setSelectedDay] = useState(now.getDate());
   const [rankTab, setRankTab] = useState<RankTab>("expense");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchTransactions(), fetchCategories(), fetchPerformance()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchTransactions, fetchCategories, fetchPerformance]);
 
   useEffect(() => {
     fetchTransactions();
@@ -187,7 +198,19 @@ export default function AnalysisScreen({ navigation }: { navigation?: any }) {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          colors={[theme.colors.primary]}
+          tintColor={theme.colors.primary}
+        />
+      }
+    >
       {/* 헤더 */}
       <View style={styles.header}>
         {/* Period mode toggle */}
@@ -197,6 +220,7 @@ export default function AnalysisScreen({ navigation }: { navigation?: any }) {
               key={m}
               style={[styles.toggleBtn, mode === m && styles.toggleBtnActive]}
               onPress={() => setMode(m)}
+              accessibilityLabel={`기간: ${m === "year" ? "연도" : m === "month" ? "월" : "일"}`}
             >
               <Text style={[styles.toggleBtnText, mode === m && styles.toggleBtnTextActive]}>
                 {m === "year" ? "연도" : m === "month" ? "월" : "일"}
@@ -207,11 +231,11 @@ export default function AnalysisScreen({ navigation }: { navigation?: any }) {
 
         {/* Period navigation */}
         <View style={styles.periodNav}>
-          <TouchableOpacity style={styles.navArrow} onPress={() => handleNav(-1)}>
+          <TouchableOpacity style={styles.navArrow} onPress={() => handleNav(-1)} accessibilityLabel="이전 기간">
             <Text style={styles.navArrowText}>{"‹"}</Text>
           </TouchableOpacity>
           <Text style={styles.periodLabel}>{periodLabel()}</Text>
-          <TouchableOpacity style={styles.navArrow} onPress={() => handleNav(1)}>
+          <TouchableOpacity style={styles.navArrow} onPress={() => handleNav(1)} accessibilityLabel="다음 기간">
             <Text style={styles.navArrowText}>{"›"}</Text>
           </TouchableOpacity>
         </View>
@@ -299,7 +323,11 @@ export default function AnalysisScreen({ navigation }: { navigation?: any }) {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>거래 내역</Text>
           {dayTxsSorted.length === 0 ? (
-            <Text style={styles.emptyText}>이 날 거래 내역이 없습니다.</Text>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 }}>
+              <Text style={{ fontSize: 48, marginBottom: 16 }}>📊</Text>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.secondary, marginBottom: 8, textAlign: 'center' }}>거래 내역 없음</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.text.hint, textAlign: 'center', lineHeight: 20 }}>이 날의 거래 내역이 없습니다.</Text>
+            </View>
           ) : (
             dayTxsSorted.map((t) => {
               const cat = categories.find((c) => c.id === t.category_id);
@@ -359,7 +387,11 @@ export default function AnalysisScreen({ navigation }: { navigation?: any }) {
         ) : (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>카테고리별 지출</Text>
-            <Text style={styles.emptyText}>지출 내역이 없습니다.</Text>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 }}>
+              <Text style={{ fontSize: 48, marginBottom: 16 }}>💳</Text>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.secondary, marginBottom: 8, textAlign: 'center' }}>지출 내역 없음</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.text.hint, textAlign: 'center', lineHeight: 20 }}>이 기간의 지출 내역이 없습니다.</Text>
+            </View>
           </View>
         )
       )}
@@ -369,7 +401,11 @@ export default function AnalysisScreen({ navigation }: { navigation?: any }) {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>카드별 실적</Text>
           {performances.length === 0 ? (
-            <Text style={styles.emptyText}>설정 {">"} 카드 관리에서 카드를 등록하세요.</Text>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 }}>
+              <Text style={{ fontSize: 48, marginBottom: 16 }}>💳</Text>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.secondary, marginBottom: 8, textAlign: 'center' }}>등록된 카드 없음</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.text.hint, textAlign: 'center', lineHeight: 20 }}>{"설정 > 카드 관리에서 카드를 등록하세요."}</Text>
+            </View>
           ) : (
             performances.map((perf) => {
               const achieved = perf.monthly_target !== null && perf.current_spending >= perf.monthly_target;
@@ -381,6 +417,7 @@ export default function AnalysisScreen({ navigation }: { navigation?: any }) {
                   style={styles.perfCard}
                   onPress={() => navigation?.navigate("CardPerformance", { item: perf })}
                   activeOpacity={0.7}
+                  accessibilityLabel={`카드 실적: ${perf.card_name}`}
                 >
                   <View style={styles.perfCardHeader}>
                     <Text style={styles.perfCardIcon}>💳</Text>
@@ -446,19 +483,25 @@ export default function AnalysisScreen({ navigation }: { navigation?: any }) {
               <TouchableOpacity
                 style={[styles.rankToggleBtn, rankTab === "expense" && styles.rankToggleBtnActive]}
                 onPress={() => setRankTab("expense")}
+                accessibilityLabel="순위: 지출"
               >
                 <Text style={[styles.rankToggleBtnText, rankTab === "expense" && styles.rankToggleBtnTextActive]}>지출</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.rankToggleBtn, rankTab === "income" && styles.rankToggleBtnActive]}
                 onPress={() => setRankTab("income")}
+                accessibilityLabel="순위: 수입"
               >
                 <Text style={[styles.rankToggleBtnText, rankTab === "income" && styles.rankToggleBtnTextActive]}>수입</Text>
               </TouchableOpacity>
             </View>
           </View>
           {ranking.length === 0 ? (
-            <Text style={styles.emptyText}>내역이 없습니다.</Text>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 }}>
+              <Text style={{ fontSize: 48, marginBottom: 16 }}>📋</Text>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.secondary, marginBottom: 8, textAlign: 'center' }}>내역 없음</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.text.hint, textAlign: 'center', lineHeight: 20 }}>이 기간의 내역이 없습니다.</Text>
+            </View>
           ) : (
             ranking.map((item, idx) => {
               const pct = maxRank > 0 ? item.total / maxRank : 0;
@@ -525,6 +568,11 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   cardTitle: { ...theme.typography.h2, color: theme.colors.text.primary, marginBottom: theme.spacing.md },
 
@@ -593,13 +641,6 @@ const styles = StyleSheet.create({
   dayTxCat: { fontSize: 14, fontWeight: "600", color: theme.colors.text.primary },
   dayTxDesc: { fontSize: 12, color: theme.colors.text.secondary, marginTop: 2 },
   dayTxAmount: { fontSize: 15, fontWeight: "700" },
-
-  emptyText: {
-    ...theme.typography.body,
-    color: theme.colors.text.hint,
-    textAlign: "center",
-    paddingVertical: theme.spacing.md,
-  },
 
   // Card performance styles
   perfCard: {
