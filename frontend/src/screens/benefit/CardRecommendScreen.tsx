@@ -14,6 +14,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useRecommendStore } from "../../store/recommendStore";
 import { RecommendResult } from "../../types";
 import { theme } from "../../theme";
+import { formatWithCommas, stripCommas } from "../../utils/formatCurrency";
 
 const CATEGORIES = ["전체", "식비", "교통", "쇼핑", "의료", "여행", "통신", "주유", "문화/여가"];
 
@@ -91,6 +92,7 @@ export default function CardRecommendScreen() {
         <TouchableOpacity
           style={styles.editBtn}
           onPress={() => navigation.navigate("CardBenefitEdit")}
+          accessibilityLabel="카드 혜택 설정"
         >
           <Ionicons name="settings-outline" size={22} color={theme.colors.primary} />
         </TouchableOpacity>
@@ -114,9 +116,10 @@ export default function CardRecommendScreen() {
                   placeholderTextColor={theme.colors.text.hint}
                   returnKeyType="search"
                   onSubmitEditing={handleSearch}
+                  accessibilityLabel="가맹점명 입력"
                 />
                 {merchantName.length > 0 && (
-                  <TouchableOpacity style={styles.clearBtn} onPress={handleClear}>
+                  <TouchableOpacity style={styles.clearBtn} onPress={handleClear} accessibilityLabel="검색 초기화">
                     <Ionicons name="close-circle" size={20} color={theme.colors.text.hint} />
                   </TouchableOpacity>
                 )}
@@ -136,6 +139,7 @@ export default function CardRecommendScreen() {
                         styles.catChipActive,
                     ]}
                     onPress={() => setSelectedCategory(cat === "전체" ? null : cat)}
+                    accessibilityLabel={`업종: ${cat}`}
                   >
                     <Text
                       style={[
@@ -156,11 +160,12 @@ export default function CardRecommendScreen() {
               <Text style={styles.sectionLabel}>결제 금액 (원)</Text>
               <TextInput
                 style={styles.amountInput}
-                value={amount}
-                onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ""))}
+                value={formatWithCommas(amount)}
+                onChangeText={(v) => setAmount(stripCommas(v))}
                 keyboardType="numeric"
-                placeholder="10000"
+                placeholder="10,000"
                 placeholderTextColor={theme.colors.text.hint}
+                accessibilityLabel="결제 금액 입력"
               />
             </View>
 
@@ -169,6 +174,7 @@ export default function CardRecommendScreen() {
               style={[styles.searchBtn, (!merchantName.trim() || isLoading) && { opacity: 0.5 }]}
               onPress={handleSearch}
               disabled={!merchantName.trim() || isLoading}
+              accessibilityLabel="추천 카드 찾기"
             >
               {isLoading ? (
                 <ActivityIndicator color="#fff" />
@@ -303,11 +309,11 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.sm,
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   resultHeader: {
     flexDirection: "row",

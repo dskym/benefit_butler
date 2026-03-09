@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { apiClient } from "../../services/api";
+import { useToastStore } from "../../store/toastStore";
 import { theme } from "../../theme";
 
 type Period = "month" | "year" | "all";
@@ -89,11 +90,8 @@ export default function ExportScreen() {
         }
       }
 
-      const msg = "엑셀 파일이 저장되었습니다.";
-      if (Platform.OS === "web") {
-        // Web: download triggers automatically
-      } else {
-        Alert.alert("내보내기 완료", msg);
+      if (Platform.OS !== "web") {
+        useToastStore.getState().showToast("엑셀 파일이 저장되었습니다.");
       }
     } catch (e: any) {
       const errMsg = e.response?.data?.detail || "내보내기에 실패했습니다.";
@@ -131,6 +129,7 @@ export default function ExportScreen() {
             ]}
             onPress={() => setPeriod(item.key)}
             activeOpacity={0.7}
+            accessibilityLabel={`기간: ${item.label}`}
           >
             <Text
               style={[
@@ -159,6 +158,7 @@ export default function ExportScreen() {
                 style={[styles.chip, year === y && styles.chipActive]}
                 onPress={() => setYear(y)}
                 activeOpacity={0.7}
+                accessibilityLabel={`연도: ${y}년`}
               >
                 <Text
                   style={[
@@ -185,6 +185,7 @@ export default function ExportScreen() {
                 style={[styles.monthChip, month === m && styles.chipActive]}
                 onPress={() => setMonth(m)}
                 activeOpacity={0.7}
+                accessibilityLabel={`월: ${m}월`}
               >
                 <Text
                   style={[
@@ -205,7 +206,8 @@ export default function ExportScreen() {
         style={[styles.exportButton, isExporting && styles.disabledButton]}
         onPress={handleExport}
         disabled={isExporting}
-        activeOpacity={0.8}
+        activeOpacity={0.7}
+        accessibilityLabel="내보내기"
       >
         {isExporting ? (
           <ActivityIndicator color="#fff" />

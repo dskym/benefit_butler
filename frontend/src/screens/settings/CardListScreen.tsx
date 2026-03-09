@@ -4,12 +4,9 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Modal,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -17,6 +14,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { useCardStore } from "../../store/cardStore";
 import { UserCard } from "../../types";
 import { theme } from "../../theme";
+import {
+  Button,
+  TextInputField,
+  BottomSheet,
+  FAB,
+  EmptyState,
+  SectionHeader,
+} from "../../components/ui";
+import { formatWithCommas, stripCommas } from "../../utils/formatCurrency";
 
 type CardType = "credit_card" | "debit_card";
 
@@ -32,8 +38,8 @@ const TYPE_ORDER: CardType[] = ["credit_card", "debit_card"];
 interface CardFormFields {
   name: string;
   type: CardType;
-  monthly_target: string;  // raw string input, converted on submit
-  billing_day: string;     // raw string input, 1~28
+  monthly_target: string;
+  billing_day: string;
 }
 
 // ── 추가 모달 ──────────────────────────────────────────────
@@ -76,81 +82,59 @@ function AddModal({ visible, onClose, onSubmit }: AddModalProps) {
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.sheetTitle}>카드 추가</Text>
+    <BottomSheet visible={visible} onClose={onClose} title="카드 추가">
+      <TextInputField
+        label="카드 이름"
+        value={fields.name}
+        onChangeText={(v) => setFields((f) => ({ ...f, name: v }))}
+        placeholder="예: 신한 SOL 체크카드"
+        autoFocus
+        accessibilityLabel="카드 이름 입력"
+      />
 
-            <Text style={styles.label}>카드 이름</Text>
-            <TextInput
-              style={styles.input}
-              value={fields.name}
-              onChangeText={(v) => setFields((f) => ({ ...f, name: v }))}
-              placeholder="예: 신한 SOL 체크카드"
-              placeholderTextColor={theme.colors.text.hint}
-              autoFocus
-            />
-
-            <Text style={styles.label}>종류</Text>
-            <View style={styles.typeRow}>
-              {TYPE_ORDER.map((t) => (
-                <TouchableOpacity
-                  key={t}
-                  style={[
-                    styles.typeBtn,
-                    fields.type === t && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-                  ]}
-                  onPress={() => setFields((f) => ({ ...f, type: t }))}
-                >
-                  <Text style={[styles.typeBtnText, fields.type === t && { color: "#fff" }]}>
-                    {TYPE_LABELS[t]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.label}>월 실적 목표 (원, 선택)</Text>
-            <TextInput
-              style={styles.input}
-              value={fields.monthly_target}
-              onChangeText={(v) => setFields((f) => ({ ...f, monthly_target: v.replace(/[^0-9]/g, "") }))}
-              keyboardType="numeric"
-              placeholder="예: 300000"
-              placeholderTextColor={theme.colors.text.hint}
-            />
-
-            <Text style={styles.label}>결제일 (1~28, 선택)</Text>
-            <TextInput
-              style={styles.input}
-              value={fields.billing_day}
-              onChangeText={(v) => setFields((f) => ({ ...f, billing_day: v.replace(/[^0-9]/g, "") }))}
-              keyboardType="numeric"
-              placeholder="예: 14  (비워두면 달력 월 기준)"
-              placeholderTextColor={theme.colors.text.hint}
-            />
-            <Text style={styles.hint}>결제일 14일이 실적 관리에 가장 편리합니다.</Text>
-
-            <View style={styles.sheetActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-                <Text style={styles.cancelBtnText}>취소</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.submitBtn, loading && { opacity: 0.6 }]}
-                onPress={handleSubmit}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.submitBtnText}>저장</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </View>
+      <Text style={styles.label}>종류</Text>
+      <View style={styles.typeRow}>
+        {TYPE_ORDER.map((t) => (
+          <TouchableOpacity
+            key={t}
+            style={[
+              styles.typeBtn,
+              fields.type === t && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+            ]}
+            onPress={() => setFields((f) => ({ ...f, type: t }))}
+            accessibilityLabel={`종류: ${TYPE_LABELS[t]}`}
+          >
+            <Text style={[styles.typeBtnText, fields.type === t && { color: "#fff" }]}>
+              {TYPE_LABELS[t]}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
-    </Modal>
+
+      <TextInputField
+        label="월 실적 목표 (원, 선택)"
+        value={formatWithCommas(fields.monthly_target)}
+        onChangeText={(v) => setFields((f) => ({ ...f, monthly_target: stripCommas(v) }))}
+        keyboardType="numeric"
+        placeholder="예: 300,000"
+        accessibilityLabel="월 실적 목표 입력"
+      />
+
+      <TextInputField
+        label="결제일 (1~28, 선택)"
+        value={fields.billing_day}
+        onChangeText={(v) => setFields((f) => ({ ...f, billing_day: v.replace(/[^0-9]/g, "") }))}
+        keyboardType="numeric"
+        placeholder="예: 14  (비워두면 달력 월 기준)"
+        hint="결제일 14일이 실적 관리에 가장 편리합니다."
+        accessibilityLabel="결제일 입력"
+      />
+
+      <View style={styles.sheetActions}>
+        <Button label="취소" variant="secondary" onPress={onClose} flex={1} />
+        <Button label="저장" onPress={handleSubmit} loading={loading} flex={2} />
+      </View>
+    </BottomSheet>
   );
 }
 
@@ -190,54 +174,32 @@ function EditModal({ card, onClose, onSubmit }: EditModalProps) {
   };
 
   return (
-    <Modal visible={!!card} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.sheetTitle}>{card.name} 설정</Text>
+    <BottomSheet visible={!!card} onClose={onClose} title={`${card.name} 설정`}>
+      <TextInputField
+        label="월 실적 목표 (원, 선택)"
+        value={formatWithCommas(fields.monthly_target)}
+        onChangeText={(v) => setFields((f) => ({ ...f, monthly_target: stripCommas(v) }))}
+        keyboardType="numeric"
+        placeholder="예: 300,000"
+        autoFocus
+        accessibilityLabel="월 실적 목표 입력"
+      />
 
-            <Text style={styles.label}>월 실적 목표 (원, 선택)</Text>
-            <TextInput
-              style={styles.input}
-              value={fields.monthly_target}
-              onChangeText={(v) => setFields((f) => ({ ...f, monthly_target: v.replace(/[^0-9]/g, "") }))}
-              keyboardType="numeric"
-              placeholder="예: 300000"
-              placeholderTextColor={theme.colors.text.hint}
-              autoFocus
-            />
+      <TextInputField
+        label="결제일 (1~28, 선택)"
+        value={fields.billing_day}
+        onChangeText={(v) => setFields((f) => ({ ...f, billing_day: v.replace(/[^0-9]/g, "") }))}
+        keyboardType="numeric"
+        placeholder="예: 14  (비워두면 달력 월 기준)"
+        hint="결제일 14일이 실적 관리에 가장 편리합니다."
+        accessibilityLabel="결제일 입력"
+      />
 
-            <Text style={styles.label}>결제일 (1~28, 선택)</Text>
-            <TextInput
-              style={styles.input}
-              value={fields.billing_day}
-              onChangeText={(v) => setFields((f) => ({ ...f, billing_day: v.replace(/[^0-9]/g, "") }))}
-              keyboardType="numeric"
-              placeholder="예: 14  (비워두면 달력 월 기준)"
-              placeholderTextColor={theme.colors.text.hint}
-            />
-            <Text style={styles.hint}>결제일 14일이 실적 관리에 가장 편리합니다.</Text>
-
-            <View style={styles.sheetActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-                <Text style={styles.cancelBtnText}>취소</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.submitBtn, loading && { opacity: 0.6 }]}
-                onPress={handleSubmit}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.submitBtnText}>저장</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </View>
+      <View style={styles.sheetActions}>
+        <Button label="취소" variant="secondary" onPress={onClose} flex={1} />
+        <Button label="저장" onPress={handleSubmit} loading={loading} flex={2} />
       </View>
-    </Modal>
+    </BottomSheet>
   );
 }
 
@@ -313,7 +275,7 @@ export default function CardListScreen() {
           contentContainerStyle={styles.listContent}
           renderItem={({ item: section }) => (
             <View style={styles.sectionBlock}>
-              <Text style={styles.sectionLabel}>{section.label}</Text>
+              <SectionHeader title={section.label} />
               <View style={styles.sectionCard}>
                 {section.data.map((card, index) => (
                   <View key={card.id}>
@@ -345,6 +307,7 @@ export default function CardListScreen() {
                         style={styles.iconBtn}
                         onPress={() => setEditingCard(card)}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel={`${card.name} 수정`}
                       >
                         <Ionicons name="pencil-outline" size={18} color={theme.colors.primary} />
                       </TouchableOpacity>
@@ -352,6 +315,7 @@ export default function CardListScreen() {
                         style={styles.iconBtn}
                         onPress={() => handleDelete(card)}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel={`${card.name} 삭제`}
                       >
                         <Ionicons name="trash-outline" size={18} color={theme.colors.expense} />
                       </TouchableOpacity>
@@ -363,20 +327,16 @@ export default function CardListScreen() {
             </View>
           )}
           ListEmptyComponent={
-            <Text style={styles.empty}>
-              등록된 카드가 없습니다.{"\n"}아래 + 버튼으로 추가해보세요.
-            </Text>
+            <EmptyState
+              icon="💳"
+              title="등록된 카드 없음"
+              subtitle="아래 + 버튼으로 카드를 추가해보세요."
+            />
           }
         />
       )}
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setAddModalVisible(true)}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+      <FAB onPress={() => setAddModalVisible(true)} accessibilityLabel="카드 추가" />
 
       <AddModal
         visible={addModalVisible}
@@ -401,18 +361,11 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   sectionBlock: { marginBottom: theme.spacing.sm },
-  sectionLabel: {
-    ...theme.typography.caption,
-    fontWeight: "700",
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.xs,
-    paddingTop: theme.spacing.md,
-  },
   sectionCard: {
     backgroundColor: theme.colors.bg,
     borderRadius: theme.radius.lg,
     overflow: "hidden",
+    ...theme.shadow.sm,
   },
   row: {
     flexDirection: "row",
@@ -433,58 +386,11 @@ const styles = StyleSheet.create({
   rowName: { fontSize: 16, color: theme.colors.text.primary },
   rowSub: { fontSize: 12, color: theme.colors.text.hint, marginTop: 2 },
   iconBtn: { padding: 6 },
-  empty: {
-    textAlign: "center",
-    color: theme.colors.text.hint,
-    marginTop: 60,
-    fontSize: 15,
-    lineHeight: 24,
-  },
-  fab: {
-    position: "absolute",
-    bottom: 28,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  fabText: { color: "#fff", fontSize: 28, fontWeight: "300", lineHeight: 32 },
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: theme.colors.bg,
-    borderTopLeftRadius: theme.radius.lg,
-    borderTopRightRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    maxHeight: "75%",
-  },
-  sheetTitle: { ...theme.typography.h2, color: theme.colors.text.primary, marginBottom: 20 },
   label: {
     ...theme.typography.caption,
     color: theme.colors.text.secondary,
     marginBottom: 6,
     marginTop: 14,
-  },
-  hint: {
-    fontSize: 12,
-    color: theme.colors.text.hint,
-    marginTop: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: theme.colors.text.primary,
   },
   typeRow: { flexDirection: "row", gap: 8 },
   typeBtn: {
@@ -497,21 +403,4 @@ const styles = StyleSheet.create({
   },
   typeBtnText: { fontSize: 14, color: theme.colors.text.secondary },
   sheetActions: { flexDirection: "row", gap: 10, marginTop: 24, marginBottom: 8 },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    alignItems: "center",
-  },
-  cancelBtnText: { color: theme.colors.text.secondary, fontSize: 15 },
-  submitBtn: {
-    flex: 2,
-    paddingVertical: 14,
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-  },
-  submitBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
 });

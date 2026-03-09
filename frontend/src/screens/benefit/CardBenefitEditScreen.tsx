@@ -1,11 +1,12 @@
 // frontend/src/screens/benefit/CardBenefitEditScreen.tsx
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Modal,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,6 +19,7 @@ import { useCardStore } from "../../store/cardStore";
 import { useCardBenefitStore } from "../../store/cardBenefitStore";
 import { UserCard, UserCardBenefit } from "../../types";
 import { theme } from "../../theme";
+import { formatWithCommas, stripCommas } from "../../utils/formatCurrency";
 
 const CATEGORIES = ["전체", "식비", "교통", "쇼핑", "의료", "여행", "통신", "주유", "문화/여가"];
 const BENEFIT_TYPES = [
@@ -115,6 +117,7 @@ function BenefitModal({ visible, editing, onClose, onSubmit }: BenefitModalProps
                     key={cat}
                     style={[styles.chip, fields.category === cat && styles.chipActive]}
                     onPress={() => setFields((f) => ({ ...f, category: cat }))}
+                    accessibilityLabel={`카테고리: ${cat}`}
                   >
                     <Text style={[styles.chipText, fields.category === cat && styles.chipTextActive]}>
                       {cat}
@@ -132,6 +135,7 @@ function BenefitModal({ visible, editing, onClose, onSubmit }: BenefitModalProps
                   key={value}
                   style={[styles.typeBtn, fields.benefit_type === value && styles.typeBtnActive]}
                   onPress={() => setFields((f) => ({ ...f, benefit_type: value }))}
+                  accessibilityLabel={`혜택 유형: ${label}`}
                 >
                   <Text style={[styles.typeBtnText, fields.benefit_type === value && styles.typeBtnTextActive]}>
                     {label}
@@ -151,6 +155,7 @@ function BenefitModal({ visible, editing, onClose, onSubmit }: BenefitModalProps
                   keyboardType="decimal-pad"
                   placeholder="예: 3 (3%)"
                   placeholderTextColor={theme.colors.text.hint}
+                  accessibilityLabel="적립률 입력"
                 />
               </>
             ) : (
@@ -158,11 +163,12 @@ function BenefitModal({ visible, editing, onClose, onSubmit }: BenefitModalProps
                 <Text style={styles.label}>고정 혜택 금액 (원)</Text>
                 <TextInput
                   style={styles.input}
-                  value={fields.flat_amount}
-                  onChangeText={(v) => setFields((f) => ({ ...f, flat_amount: v.replace(/[^0-9]/g, "") }))}
+                  value={formatWithCommas(fields.flat_amount)}
+                  onChangeText={(v) => setFields((f) => ({ ...f, flat_amount: stripCommas(v) }))}
                   keyboardType="numeric"
-                  placeholder="예: 2000"
+                  placeholder="예: 2,000"
                   placeholderTextColor={theme.colors.text.hint}
+                  accessibilityLabel="고정 혜택 금액 입력"
                 />
               </>
             )}
@@ -171,32 +177,35 @@ function BenefitModal({ visible, editing, onClose, onSubmit }: BenefitModalProps
             <Text style={styles.label}>월 최대 혜택 한도 (원, 선택)</Text>
             <TextInput
               style={styles.input}
-              value={fields.monthly_cap}
-              onChangeText={(v) => setFields((f) => ({ ...f, monthly_cap: v.replace(/[^0-9]/g, "") }))}
+              value={formatWithCommas(fields.monthly_cap)}
+              onChangeText={(v) => setFields((f) => ({ ...f, monthly_cap: stripCommas(v) }))}
               keyboardType="numeric"
-              placeholder="예: 10000  (비워두면 무제한)"
+              placeholder="예: 10,000  (비워두면 무제한)"
               placeholderTextColor={theme.colors.text.hint}
+              accessibilityLabel="월 최대 혜택 한도 입력"
             />
 
             {/* 최소 결제금액 */}
             <Text style={styles.label}>최소 결제 금액 (원, 선택)</Text>
             <TextInput
               style={styles.input}
-              value={fields.min_amount}
-              onChangeText={(v) => setFields((f) => ({ ...f, min_amount: v.replace(/[^0-9]/g, "") }))}
+              value={formatWithCommas(fields.min_amount)}
+              onChangeText={(v) => setFields((f) => ({ ...f, min_amount: stripCommas(v) }))}
               keyboardType="numeric"
-              placeholder="예: 5000  (비워두면 조건 없음)"
+              placeholder="예: 5,000  (비워두면 조건 없음)"
               placeholderTextColor={theme.colors.text.hint}
+              accessibilityLabel="최소 결제 금액 입력"
             />
 
             <View style={styles.actions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={onClose} accessibilityLabel="취소">
                 <Text style={styles.cancelBtnText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.submitBtn, loading && { opacity: 0.6 }]}
                 onPress={handleSubmit}
                 disabled={loading}
+                accessibilityLabel="저장"
               >
                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>저장</Text>}
               </TouchableOpacity>
@@ -249,13 +258,14 @@ function BenefitRow({ benefit, onEdit, onDelete }: BenefitRowProps) {
         </View>
       </View>
       <View style={styles.benefitActions}>
-        <TouchableOpacity onPress={onEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={onEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityLabel="혜택 수정">
           <Ionicons name="pencil-outline" size={18} color={theme.colors.primary} />
         </TouchableOpacity>
         <TouchableOpacity
           onPress={onDelete}
           style={{ marginLeft: 12 }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="혜택 삭제"
         >
           <Ionicons name="trash-outline" size={18} color={theme.colors.expense} />
         </TouchableOpacity>
@@ -274,6 +284,19 @@ export default function CardBenefitEditScreen() {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingBenefit, setEditingBenefit] = useState<UserCardBenefit | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchCards();
+      if (selectedCardId) {
+        await fetchBenefits(selectedCardId);
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchCards, fetchBenefits, selectedCardId]);
 
   useEffect(() => {
     fetchCards();
@@ -346,9 +369,10 @@ export default function CardBenefitEditScreen() {
       {cardsLoading ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={theme.colors.primary} />
       ) : cards.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="card-outline" size={48} color={theme.colors.text.hint} />
-          <Text style={styles.emptyText}>등록된 카드가 없습니다.{"\n"}설정에서 카드를 먼저 추가해주세요.</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 }}>
+          <Text style={{ fontSize: 48, marginBottom: 16 }}>💳</Text>
+          <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.secondary, marginBottom: 8, textAlign: 'center' }}>등록된 카드 없음</Text>
+          <Text style={{ fontSize: 14, color: theme.colors.text.hint, textAlign: 'center', lineHeight: 20 }}>설정에서 카드를 먼저 추가해주세요.</Text>
         </View>
       ) : (
         <>
@@ -364,6 +388,7 @@ export default function CardBenefitEditScreen() {
                 key={card.id}
                 style={[styles.cardChip, selectedCardId === card.id && styles.cardChipActive]}
                 onPress={() => handleSelectCard(card)}
+                accessibilityLabel={`카드 선택: ${card.name}`}
               >
                 <Ionicons
                   name="card-outline"
@@ -391,6 +416,14 @@ export default function CardBenefitEditScreen() {
               data={currentBenefits}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.benefitListContent}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={[theme.colors.primary]}
+                  tintColor={theme.colors.primary}
+                />
+              }
               renderItem={({ item }) => (
                 <BenefitRow
                   benefit={item}
@@ -399,8 +432,10 @@ export default function CardBenefitEditScreen() {
                 />
               )}
               ListEmptyComponent={
-                <View style={styles.emptyBenefits}>
-                  <Text style={styles.emptyBenefitsText}>이 카드에 혜택이 없습니다.{"\n"}아래 + 버튼으로 추가해보세요.</Text>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 }}>
+                  <Text style={{ fontSize: 48, marginBottom: 16 }}>🎁</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.secondary, marginBottom: 8, textAlign: 'center' }}>등록된 혜택 없음</Text>
+                  <Text style={{ fontSize: 14, color: theme.colors.text.hint, textAlign: 'center', lineHeight: 20 }}>아래 + 버튼으로 혜택을 추가해보세요.</Text>
                 </View>
               }
             />
@@ -410,7 +445,7 @@ export default function CardBenefitEditScreen() {
 
       {/* FAB */}
       {cards.length > 0 && (
-        <TouchableOpacity style={styles.fab} onPress={handleOpenAdd} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.fab} onPress={handleOpenAdd} activeOpacity={0.7} accessibilityLabel="혜택 추가">
           <Text style={styles.fabText}>+</Text>
         </TouchableOpacity>
       )}
@@ -435,14 +470,7 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   headerTitle: { ...theme.typography.h2, color: theme.colors.text.primary },
-  emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: theme.spacing.xl },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 15,
-    color: theme.colors.text.hint,
-    textAlign: "center",
-    lineHeight: 24,
-  },
+  // emptyContainer/emptyText styles removed — unified empty state pattern uses inline styles
   cardSelectorScroll: { flexGrow: 0, backgroundColor: theme.colors.bg },
   cardSelectorContent: {
     paddingHorizontal: theme.spacing.md,
@@ -476,6 +504,11 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   benefitInfo: { flex: 1, flexDirection: "row", alignItems: "flex-start" },
   benefitChip: {
@@ -489,13 +522,7 @@ const styles = StyleSheet.create({
   benefitValueText: { fontSize: 14, fontWeight: "600", color: theme.colors.text.primary },
   benefitSubText: { fontSize: 12, color: theme.colors.text.hint, marginTop: 2 },
   benefitActions: { flexDirection: "row", alignItems: "center" },
-  emptyBenefits: { marginTop: 48, alignItems: "center" },
-  emptyBenefitsText: {
-    fontSize: 14,
-    color: theme.colors.text.hint,
-    textAlign: "center",
-    lineHeight: 22,
-  },
+  // emptyBenefits/emptyBenefitsText styles removed — unified empty state pattern uses inline styles
   fab: {
     position: "absolute",
     bottom: 28,

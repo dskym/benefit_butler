@@ -1,11 +1,12 @@
 // frontend/src/screens/transactions/TransactionListScreen.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Modal,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +21,8 @@ import { Transaction } from "../../types";
 import { theme } from "../../theme";
 import { suggestCategory } from "../../utils/categoryKeywords";
 import { useNetworkStatus } from "../../hooks/useNetworkStatus";
+import { formatWithCommas, stripCommas } from "../../utils/formatCurrency";
+import { TransactionSkeleton } from "../../components/SkeletonLoader";
 
 // ── 상수 ─────────────────────────────────────────────────
 
@@ -278,6 +281,9 @@ function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.sheet}>
+          <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 8 }} accessibilityLabel="모달 핸들">
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#D1D5DB' }} />
+          </View>
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={styles.label}>날짜 및 시간 (YYYY-MM-DD HH:MM)</Text>
             <TextInput
@@ -288,6 +294,7 @@ function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }
               placeholderTextColor={theme.colors.text.hint}
               autoCapitalize="none"
               keyboardType="numbers-and-punctuation"
+              accessibilityLabel="날짜 및 시간 입력"
             />
 
             <Text style={styles.label}>종류</Text>
@@ -300,6 +307,7 @@ function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }
                     type === t.key && { backgroundColor: t.color, borderColor: t.color },
                   ]}
                   onPress={() => handleTypeChange(t.key)}
+                  accessibilityLabel={`종류: ${t.label}`}
                 >
                   <Text style={[styles.typeBtnText, type === t.key && { color: "#fff" }]}>
                     {t.label}
@@ -311,11 +319,12 @@ function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }
             <Text style={styles.label}>금액 (원)</Text>
             <TextInput
               style={styles.input}
-              value={amount}
-              onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ""))}
-              placeholder="예: 15000"
+              value={formatWithCommas(amount)}
+              onChangeText={(v) => setAmount(stripCommas(v))}
+              placeholder="예: 15,000"
               placeholderTextColor={theme.colors.text.hint}
               keyboardType="numeric"
+              accessibilityLabel="금액 입력"
             />
 
             <Text style={styles.label}>메모 (가맹점명)</Text>
@@ -325,6 +334,7 @@ function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }
               onChangeText={handleDescriptionChange}
               placeholder="가맹점명 입력 시 카테고리 자동 추천"
               placeholderTextColor={theme.colors.text.hint}
+              accessibilityLabel="메모 입력"
             />
 
             <Text style={styles.label}>카테고리 (선택)</Text>
@@ -454,13 +464,14 @@ function FormModal({ visible, initial, prefill, initialDate, onClose, onSubmit }
             )}
 
             <View style={styles.sheetActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={onClose} accessibilityLabel="취소">
                 <Text style={styles.cancelBtnText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.submitBtn, loading && { opacity: 0.6 }]}
                 onPress={handleSubmit}
                 disabled={loading}
+                accessibilityLabel="저장"
               >
                 {loading ? (
                   <ActivityIndicator color="#fff" />
@@ -560,6 +571,16 @@ export default function TransactionListScreen() {
   const [contextTx, setContextTx] = useState<Transaction | null>(null);
   const [favoritePrefill, setFavoritePrefill] = useState<Transaction | null>(null);
   const [favExpanded, setFavExpanded] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchTransactions(), fetchCategories(), fetchCards()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchTransactions, fetchCategories, fetchCards]);
 
   // Step 2: calendar state
   const today = useMemo(() => todayKey(), []);
@@ -778,7 +799,7 @@ export default function TransactionListScreen() {
       <View style={styles.calendarSection}>
         {/* Month navigator */}
         <View style={styles.monthNav}>
-          <TouchableOpacity style={styles.monthNavBtn} onPress={prevMonth} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.monthNavBtn} onPress={prevMonth} activeOpacity={0.7} accessibilityLabel="이전 달">
             <Text style={styles.monthNavArrow}>‹</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -792,7 +813,7 @@ export default function TransactionListScreen() {
               {year}년 {month + 1}월
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.monthNavBtn} onPress={nextMonth} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.monthNavBtn} onPress={nextMonth} activeOpacity={0.7} accessibilityLabel="다음 달">
             <Text style={styles.monthNavArrow}>›</Text>
           </TouchableOpacity>
         </View>
@@ -835,7 +856,7 @@ export default function TransactionListScreen() {
       {/* Step 3: Transaction list (scrollable) */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color={theme.colors.primary} />
+          <TransactionSkeleton />
         </View>
       ) : (
         <FlatList
@@ -843,6 +864,14 @@ export default function TransactionListScreen() {
           keyExtractor={(item) => item.id}
           style={styles.list}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
+            />
+          }
           ListHeaderComponent={
             <FavoritesSection
               favorites={favorites}
@@ -887,6 +916,7 @@ export default function TransactionListScreen() {
                   style={styles.deleteBtn}
                   onPress={() => handleDelete(item)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityLabel="삭제"
                 >
                   <Text style={styles.deleteBtnText}>삭제</Text>
                 </TouchableOpacity>
@@ -894,15 +924,17 @@ export default function TransactionListScreen() {
             );
           }}
           ListEmptyComponent={
-            <Text style={styles.empty}>
-              {selectedDay ? "이 날 거래 내역이 없습니다." : "이 달 거래 내역이 없습니다."}
-            </Text>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 }}>
+              <Text style={{ fontSize: 48, marginBottom: 16 }}>📝</Text>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.secondary, marginBottom: 8, textAlign: 'center' }}>거래 내역 없음</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.text.hint, textAlign: 'center', lineHeight: 20 }}>새로운 거래를 추가해보세요.</Text>
+            </View>
           }
         />
       )}
 
       {/* Step 4: FAB — pre-fills selectedDay */}
-      <TouchableOpacity style={styles.fab} onPress={openCreate} activeOpacity={0.85}>
+      <TouchableOpacity style={styles.fab} onPress={openCreate} activeOpacity={0.7} accessibilityLabel="거래 추가">
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
@@ -935,7 +967,7 @@ export default function TransactionListScreen() {
             <Text style={styles.contextTitle} numberOfLines={1}>
               {contextTx?.description ?? TYPE_LABELS[contextTx?.type ?? "expense"] ?? "거래"}
             </Text>
-            <TouchableOpacity style={styles.contextOption} onPress={handleToggleFavorite}>
+            <TouchableOpacity style={styles.contextOption} onPress={handleToggleFavorite} accessibilityLabel={contextTx?.is_favorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}>
               <Text style={styles.contextOptionText}>
                 {contextTx?.is_favorite ? "⭐ 즐겨찾기 해제" : "☆ 즐겨찾기 추가"}
               </Text>
@@ -943,6 +975,7 @@ export default function TransactionListScreen() {
             <TouchableOpacity
               style={styles.contextCancel}
               onPress={() => setContextTx(null)}
+              accessibilityLabel="취소"
             >
               <Text style={styles.contextCancelText}>취소</Text>
             </TouchableOpacity>
@@ -1094,13 +1127,6 @@ const styles = StyleSheet.create({
   rowAmount: { fontSize: 15, fontWeight: "600", marginRight: theme.spacing.sm },
   deleteBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   deleteBtnText: { color: theme.colors.expense, fontSize: 13 },
-  empty: {
-    textAlign: "center",
-    color: theme.colors.text.hint,
-    marginTop: 40,
-    fontSize: 15,
-  },
-
   // FAB
   fab: {
     position: "absolute",
@@ -1131,7 +1157,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: theme.radius.lg,
     borderTopRightRadius: theme.radius.lg,
     padding: theme.spacing.lg,
-    height: "90%",
+    maxHeight: "85%",
   },
   sheetTitle: {
     ...theme.typography.h2,

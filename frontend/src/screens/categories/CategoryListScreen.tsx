@@ -85,6 +85,9 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.sheet}>
+          <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 8 }} accessibilityLabel="모달 핸들">
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#D1D5DB' }} />
+          </View>
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={styles.sheetTitle}>{initial ? "카테고리 수정" : "카테고리 추가"}</Text>
 
@@ -95,6 +98,7 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
               onChangeText={setName}
               placeholder="예: 식비"
               placeholderTextColor={theme.colors.text.hint}
+              accessibilityLabel="카테고리 이름 입력"
             />
 
             <Text style={styles.label}>종류</Text>
@@ -107,6 +111,7 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
                     type === t && { backgroundColor: TYPE_COLORS[t], borderColor: TYPE_COLORS[t] },
                   ]}
                   onPress={() => setType(t)}
+                  accessibilityLabel={`종류: ${TYPE_LABELS[t]}`}
                 >
                   <Text style={[styles.typeBtnText, type === t && { color: "#fff" }]}>
                     {TYPE_LABELS[t]}
@@ -122,7 +127,8 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
                   key={c}
                   style={[styles.swatch, { backgroundColor: c }, color === c && styles.swatchSelected]}
                   onPress={() => setColor(c)}
-                  activeOpacity={0.8}
+                  activeOpacity={0.7}
+                  accessibilityLabel={`색상: ${c}`}
                 >
                   {color === c && <Ionicons name="checkmark" size={14} color="#fff" />}
                 </TouchableOpacity>
@@ -130,13 +136,14 @@ function FormModal({ visible, initial, onClose, onSubmit }: FormModalProps) {
             </View>
 
             <View style={styles.sheetActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={onClose} accessibilityLabel="취소">
                 <Text style={styles.cancelBtnText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.submitBtn, loading && { opacity: 0.6 }]}
                 onPress={handleSubmit}
                 disabled={loading}
+                accessibilityLabel="저장"
               >
                 {loading ? (
                   <ActivityIndicator color="#fff" />
@@ -267,10 +274,10 @@ export default function CategoryListScreen() {
                   </View>
                 ) : (
                   <View style={styles.rowActions}>
-                    <TouchableOpacity style={styles.iconBtn} onPress={() => openEdit(item)}>
+                    <TouchableOpacity style={styles.iconBtn} onPress={() => openEdit(item)} accessibilityLabel={`카테고리 수정: ${item.name}`}>
                       <Ionicons name="pencil-outline" size={18} color={theme.colors.primary} />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.iconBtn} onPress={() => handleDelete(item)}>
+                    <TouchableOpacity style={styles.iconBtn} onPress={() => handleDelete(item)} accessibilityLabel={`카테고리 삭제: ${item.name}`}>
                       <Ionicons name="trash-outline" size={18} color={theme.colors.expense} />
                     </TouchableOpacity>
                   </View>
@@ -279,14 +286,18 @@ export default function CategoryListScreen() {
             );
           }}
           ListEmptyComponent={
-            <Text style={styles.empty}>카테고리가 없습니다. 추가해보세요!</Text>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 }}>
+              <Text style={{ fontSize: 48, marginBottom: 16 }}>🏷️</Text>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text.secondary, marginBottom: 8, textAlign: 'center' }}>카테고리 없음</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.text.hint, textAlign: 'center', lineHeight: 20 }}>카테고리를 추가해보세요.</Text>
+            </View>
           }
         />
       )}
 
       {/* 플로팅 추가 버튼 */}
       {canAddMore && (
-        <TouchableOpacity style={styles.fab} onPress={openCreate} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.fab} onPress={openCreate} activeOpacity={0.7} accessibilityLabel="카테고리 추가">
           <Text style={styles.fabText}>+</Text>
         </TouchableOpacity>
       )}
@@ -354,7 +365,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text.hint,
     fontWeight: "500" as const,
   },
-  empty: { textAlign: "center", color: theme.colors.text.hint, marginTop: 60, fontSize: 15 },
+  // empty style removed — unified empty state pattern uses inline styles
   fab: {
     position: "absolute",
     bottom: 28,
