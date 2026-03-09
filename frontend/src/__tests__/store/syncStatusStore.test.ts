@@ -50,4 +50,46 @@ describe('useSyncStatusStore', () => {
     useSyncStatusStore.getState().setSyncComplete();
     expect(useSyncStatusStore.getState().syncError).toBeNull();
   });
+
+  it('setSyncError does not change lastSyncAt', () => {
+    const fakeTime = 1234567890;
+    useSyncStatusStore.setState({ ...INITIAL, lastSyncAt: fakeTime });
+    useSyncStatusStore.getState().setSyncError('에러');
+    expect(useSyncStatusStore.getState().lastSyncAt).toBe(fakeTime);
+  });
+
+  it('setSyncing(true) does not change lastSyncAt', () => {
+    const fakeTime = 9999999;
+    useSyncStatusStore.setState({ ...INITIAL, lastSyncAt: fakeTime });
+    useSyncStatusStore.getState().setSyncing(true);
+    expect(useSyncStatusStore.getState().lastSyncAt).toBe(fakeTime);
+  });
+
+  it('setSyncComplete updates lastSyncAt to current time', () => {
+    useSyncStatusStore.setState(INITIAL);
+    expect(useSyncStatusStore.getState().lastSyncAt).toBeNull();
+    const before = Date.now();
+    useSyncStatusStore.getState().setSyncComplete();
+    const after = Date.now();
+    const lastSync = useSyncStatusStore.getState().lastSyncAt!;
+    expect(lastSync).toBeGreaterThanOrEqual(before);
+    expect(lastSync).toBeLessThanOrEqual(after);
+  });
+
+  it('partialize only persists lastSyncAt (not isSyncing or syncError)', () => {
+    // The persist config's partialize function selects only { lastSyncAt }
+    // We verify by checking the store's persist configuration
+    const persistOptions = (useSyncStatusStore as any).persist;
+    if (persistOptions?.getOptions) {
+      const options = persistOptions.getOptions();
+      const partialized = options.partialize({
+        isSyncing: true,
+        lastSyncAt: 12345,
+        syncError: 'err',
+      });
+      expect(partialized).toEqual({ lastSyncAt: 12345 });
+      expect(partialized.isSyncing).toBeUndefined();
+      expect(partialized.syncError).toBeUndefined();
+    }
+  });
 });

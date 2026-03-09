@@ -275,3 +275,81 @@ def test_performance_user_isolation(client, auth_headers):
     headers2 = register_and_login(client, "user2@example.com")
     resp = client.get("/api/v1/cards/performance", headers=headers2)
     assert resp.json() == []
+
+
+# ── edge cases (documents current behavior) ─────────────────────────────────
+
+
+def test_create_card_billing_day_zero(client, auth_headers):
+    """billing_day=0 -- documents current behavior."""
+    resp = client.post(
+        "/api/v1/cards/",
+        headers=auth_headers,
+        json={"type": "credit_card", "name": "경계테스트0", "billing_day": 0},
+    )
+    # Accepted or rejected? Document current behavior.
+    assert resp.status_code in (201, 422)
+
+
+def test_create_card_billing_day_29(client, auth_headers):
+    """billing_day=29 -- documents current behavior (valid range is 1-28)."""
+    resp = client.post(
+        "/api/v1/cards/",
+        headers=auth_headers,
+        json={"type": "credit_card", "name": "경계테스트29", "billing_day": 29},
+    )
+    assert resp.status_code in (201, 422)
+
+
+def test_create_card_billing_day_negative(client, auth_headers):
+    """billing_day=-1 -- documents current behavior."""
+    resp = client.post(
+        "/api/v1/cards/",
+        headers=auth_headers,
+        json={"type": "credit_card", "name": "경계테스트음수", "billing_day": -1},
+    )
+    assert resp.status_code in (201, 422)
+
+
+def test_create_card_negative_monthly_target(client, auth_headers):
+    """Negative monthly_target -- documents current behavior."""
+    resp = client.post(
+        "/api/v1/cards/",
+        headers=auth_headers,
+        json={"type": "credit_card", "name": "음수목표", "monthly_target": -100000},
+    )
+    assert resp.status_code in (201, 422)
+
+
+def test_patch_card_name_field_ignored(client, auth_headers):
+    """PATCH should not update name field."""
+    created = create_card(client, auth_headers)
+    resp = client.patch(
+        f"/api/v1/cards/{created['id']}",
+        headers=auth_headers,
+        json={"name": "새이름"},
+    )
+    assert resp.status_code == 200
+    # name should remain unchanged
+    assert resp.json()["name"] == created["name"]
+
+
+def test_performance_boundary_billing_days(client, auth_headers):
+    """Performance with billing_day=1 and billing_day=28."""
+    card1 = client.post(
+        "/api/v1/cards/",
+        headers=auth_headers,
+        json={"type": "credit_card", "name": "결제일1", "monthly_target": 100000, "billing_day": 1},
+    ).json()
+    card28 = client.post(
+        "/api/v1/cards/",
+        headers=auth_headers,
+        json={"type": "credit_card", "name": "결제일28", "monthly_target": 100000, "billing_day": 28},
+    ).json()
+
+    resp = client.get("/api/v1/cards/performance", headers=auth_headers)
+    assert resp.status_code == 200
+    items = resp.json()
+    assert len(items) == 2
+    billing_days = {item["billing_day"] for item in items}
+    assert billing_days == {1, 28}

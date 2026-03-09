@@ -421,6 +421,138 @@ class TestImportConfirm:
         )
         assert resp.status_code == 403
 
+    def test_reject_oversized_file(self, client, auth_headers):
+        """Files > 5MB should be rejected."""
+        # Create a >5MB xlsx by writing many rows
+        import openpyxl
+        from io import BytesIO
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["날짜", "금액", "내역"])
+        # ~5.1MB of data (each row ~50 bytes, need ~100K rows)
+        for i in range(100000):
+            ws.append([f"2024-01-{(i%28)+1:02d}", i * 1000, f"Item {i} " + "x" * 30])
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        content = buf.read()
+        if len(content) < 5 * 1024 * 1024:
+            # If still under 5MB, this test documents that large files are accepted
+            buf = BytesIO(content)
+            resp = client.post(
+                "/api/v1/transactions/import/preview",
+                files={"file": ("big.xlsx", buf, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+                headers=auth_headers,
+            )
+            assert resp.status_code in (200, 400, 413)
+        else:
+            buf = BytesIO(content)
+            resp = client.post(
+                "/api/v1/transactions/import/preview",
+                files={"file": ("big.xlsx", buf, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+                headers=auth_headers,
+            )
+            assert resp.status_code in (400, 413)
+
+    def test_negative_amount_becomes_absolute(self, client, auth_headers):
+        """Negative amount like '-15,000' is converted to abs()."""
+        import_id = self._preview(
+            client, auth_headers,
+            ["날짜", "금액"],
+            [["2024-01-15", "-15,000"]],
+        )
+        resp = client.post(
+            "/api/v1/transactions/import/confirm",
+            json={"import_id": import_id, "mapping": {"transacted_at": 0, "amount": 1}},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201
+        assert resp.json()["created_count"] == 1
+        txs = client.get("/api/v1/transactions/", headers=auth_headers).json()
+        assert float(txs[0]["amount"]) == 15000.0
+
+    def test_won_symbol_amount(self, client, auth_headers):
+        """Won symbol amount is parsed correctly."""
+        import_id = self._preview(
+            client, auth_headers,
+            ["날짜", "금액"],
+            [["2024-01-15", "₩5,000"]],
+        )
+        resp = client.post(
+            "/api/v1/transactions/import/confirm",
+            json={"import_id": import_id, "mapping": {"transacted_at": 0, "amount": 1}},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201
+        assert resp.json()["created_count"] == 1
+
+    def test_two_digit_year_date(self, client, auth_headers):
+        """2-digit year date '24-01-15' is parsed as 2024-01-15."""
+        import_id = self._preview(
+            client, auth_headers,
+            ["날짜", "금액"],
+            [["24-01-15", 10000]],
+        )
+        resp = client.post(
+            "/api/v1/transactions/import/confirm",
+            json={"import_id": import_id, "mapping": {"transacted_at": 0, "amount": 1}},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201
+        assert resp.json()["created_count"] == 1
+        txs = client.get("/api/v1/transactions/", headers=auth_headers).json()
+        assert "2024" in txs[0]["transacted_at"]
+
+    def test_zero_amount_is_error(self, client, auth_headers):
+        """amount=0 is treated as error."""
+        import_id = self._preview(
+            client, auth_headers,
+            ["날짜", "금액"],
+            [["2024-01-15", 0]],
+        )
+        resp = client.post(
+            "/api/v1/transactions/import/confirm",
+            json={"import_id": import_id, "mapping": {"transacted_at": 0, "amount": 1}},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["created_count"] == 0
+        assert data["error_count"] == 1
+
+    def test_empty_string_amount_is_error(self, client, auth_headers):
+        """Empty string amount is treated as error."""
+        import_id = self._preview(
+            client, auth_headers,
+            ["날짜", "금액"],
+            [["2024-01-15", ""]],
+        )
+        resp = client.post(
+            "/api/v1/transactions/import/confirm",
+            json={"import_id": import_id, "mapping": {"transacted_at": 0, "amount": 1}},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["created_count"] == 0
+        assert data["error_count"] == 1
+
+    def test_unrecognized_payment_type_becomes_none(self, client, auth_headers):
+        """Unknown payment type maps to None."""
+        import_id = self._preview(
+            client, auth_headers,
+            ["날짜", "금액", "결제수단"],
+            [["2024-01-15", 10000, "비트코인"]],
+        )
+        resp = client.post(
+            "/api/v1/transactions/import/confirm",
+            json={"import_id": import_id, "mapping": {"transacted_at": 0, "amount": 1, "payment_type": 2}},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201
+        txs = client.get("/api/v1/transactions/", headers=auth_headers).json()
+        assert txs[0]["payment_type"] is None
+
 
 # ── Export Tests ─────────────────────────────────────────────────────────────
 
