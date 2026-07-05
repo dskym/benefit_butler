@@ -25,12 +25,16 @@ class UserCardBenefitUpdate(BaseModel):
 class UserCardBenefitResponse(BaseModel):
     id: uuid.UUID
     user_card_id: uuid.UUID
-    category: str
+    title: str | None
+    target_type: str  # "all" | "category" | "merchant"
+    category: str | None
+    merchant_names: list[str]
     benefit_type: str
     rate: float | None
     flat_amount: int | None
     monthly_cap: int | None
     min_amount: int | None
+    requires_performance: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}

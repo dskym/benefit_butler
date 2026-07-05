@@ -44,9 +44,12 @@ def create_benefit(
     db: Session = Depends(get_db),
 ):
     _get_owned_card(db, current_user.id, card_id)
+    # 구 클라이언트 호환: category="전체"는 target_type="all"로 정규화
+    is_all = data.category == "전체"
     benefit = UserCardBenefit(
         user_card_id=card_id,
-        category=data.category,
+        target_type="all" if is_all else "category",
+        category=None if is_all else data.category,
         benefit_type=data.benefit_type,
         rate=data.rate,
         flat_amount=data.flat_amount,
@@ -76,7 +79,13 @@ def update_benefit(
     )
     if benefit is None:
         raise HTTPException(status_code=404, detail="Benefit not found")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    updates = data.model_dump(exclude_unset=True)
+    if updates.get("category") == "전체":
+        updates["category"] = None
+        updates["target_type"] = "all"
+    elif updates.get("category"):
+        updates["target_type"] = "category"
+    for field, value in updates.items():
         setattr(benefit, field, value)
     db.commit()
     db.refresh(benefit)

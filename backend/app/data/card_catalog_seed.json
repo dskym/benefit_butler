@@ -1,0 +1,273 @@
+{
+  "_comment": "카드 카탈로그 시드. 실제 약관은 시간대·요일·택1 패키지 등 복잡한 조건이 있으나 본 모델의 (target, benefit_type, rate/flat_amount, monthly_cap, min_amount, requires_performance) 구조로 근사한다. 출처: 각 카드사 공식 홈페이지, 카드고릴라 (2026-03 기준). merchants[].category와 benefits[].target.category는 app/constants.py의 BENEFIT_CATEGORIES를 따른다. benefits[].target.merchants의 이름은 merchants[].name과 정확히 일치해야 한다.",
+  "merchants": [
+    { "name": "스타벅스", "category": "식비", "aliases": ["스타벅스코리아", "starbucks", "스벅"] },
+    { "name": "이디야커피", "category": "식비", "aliases": ["이디야", "ediya"] },
+    { "name": "투썸플레이스", "category": "식비", "aliases": ["투썸", "twosome"] },
+    { "name": "메가커피", "category": "식비", "aliases": ["메가엠지씨커피", "megacoffee"] },
+    { "name": "빽다방", "category": "식비", "aliases": ["paikdabang"] },
+    { "name": "컴포즈커피", "category": "식비", "aliases": ["compose"] },
+    { "name": "커피빈", "category": "식비", "aliases": ["coffeebean", "커피빈코리아"] },
+    { "name": "폴바셋", "category": "식비", "aliases": ["paulbassett"] },
+    { "name": "할리스", "category": "식비", "aliases": ["할리스커피", "hollys"] },
+    { "name": "공차", "category": "식비", "aliases": ["gongcha"] },
+    { "name": "배스킨라빈스", "category": "식비", "aliases": ["베스킨라빈스", "baskinrobbins", "br31"] },
+    { "name": "설빙", "category": "식비", "aliases": ["sulbing"] },
+    { "name": "맥도날드", "category": "식비", "aliases": ["mcdonalds", "맥날"] },
+    { "name": "버거킹", "category": "식비", "aliases": ["burgerking"] },
+    { "name": "롯데리아", "category": "식비", "aliases": ["lotteria"] },
+    { "name": "KFC", "category": "식비", "aliases": ["케이에프씨"] },
+    { "name": "맘스터치", "category": "식비", "aliases": ["momstouch"] },
+    { "name": "서브웨이", "category": "식비", "aliases": ["subway"] },
+    { "name": "파리바게뜨", "category": "식비", "aliases": ["파리바게트", "parisbaguette"] },
+    { "name": "뚜레쥬르", "category": "식비", "aliases": ["touslesjours"] },
+    { "name": "던킨", "category": "식비", "aliases": ["던킨도너츠", "dunkin"] },
+    { "name": "배달의민족", "category": "식비", "aliases": ["배민", "baemin", "우아한형제들"] },
+    { "name": "요기요", "category": "식비", "aliases": ["yogiyo"] },
+    { "name": "쿠팡이츠", "category": "식비", "aliases": ["coupangeats"] },
+    { "name": "교촌치킨", "category": "식비", "aliases": ["교촌", "kyochon"] },
+    { "name": "BBQ", "category": "식비", "aliases": ["비비큐치킨"] },
+    { "name": "bhc", "category": "식비", "aliases": ["비에이치씨"] },
+    { "name": "본죽", "category": "식비", "aliases": ["본죽앤비빔밥"] },
+    { "name": "한솥", "category": "식비", "aliases": ["한솥도시락"] },
+
+    { "name": "카카오T", "category": "교통", "aliases": ["카카오택시", "카카오모빌리티"] },
+    { "name": "쏘카", "category": "교통", "aliases": ["socar"] },
+    { "name": "코레일", "category": "교통", "aliases": ["korail", "ktx", "한국철도공사"] },
+    { "name": "SRT", "category": "교통", "aliases": ["에스알"] },
+    { "name": "티머니", "category": "교통", "aliases": ["tmoney", "t머니"] },
+
+    { "name": "쿠팡", "category": "쇼핑", "aliases": ["coupang", "쿠팡페이"] },
+    { "name": "11번가", "category": "쇼핑", "aliases": ["십일번가", "11st"] },
+    { "name": "G마켓", "category": "쇼핑", "aliases": ["지마켓", "gmarket"] },
+    { "name": "옥션", "category": "쇼핑", "aliases": ["auction"] },
+    { "name": "위메프", "category": "쇼핑", "aliases": ["wemakeprice"] },
+    { "name": "SSG닷컴", "category": "쇼핑", "aliases": ["쓱닷컴", "ssg"] },
+    { "name": "롯데온", "category": "쇼핑", "aliases": ["lotteon"] },
+    { "name": "네이버쇼핑", "category": "쇼핑", "aliases": ["네이버페이", "naverpay"] },
+    { "name": "무신사", "category": "쇼핑", "aliases": ["musinsa"] },
+    { "name": "올리브영", "category": "쇼핑", "aliases": ["oliveyoung"] },
+    { "name": "유니클로", "category": "쇼핑", "aliases": ["uniqlo"] },
+    { "name": "다이소", "category": "쇼핑", "aliases": ["daiso"] },
+    { "name": "이마트", "category": "쇼핑", "aliases": ["emart"] },
+    { "name": "트레이더스", "category": "쇼핑", "aliases": ["traders", "이마트트레이더스"] },
+    { "name": "홈플러스", "category": "쇼핑", "aliases": ["homeplus"] },
+    { "name": "롯데마트", "category": "쇼핑", "aliases": ["lottemart"] },
+    { "name": "코스트코", "category": "쇼핑", "aliases": ["costco"] },
+    { "name": "GS25", "category": "쇼핑", "aliases": ["지에스25", "gs편의점"] },
+    { "name": "CU", "category": "쇼핑", "aliases": ["씨유", "cu편의점"] },
+    { "name": "세븐일레븐", "category": "쇼핑", "aliases": ["7eleven", "세븐"] },
+    { "name": "이마트24", "category": "쇼핑", "aliases": ["emart24"] },
+    { "name": "교보문고", "category": "쇼핑", "aliases": ["kyobobook"] },
+    { "name": "하이마트", "category": "쇼핑", "aliases": ["롯데하이마트", "himart"] },
+
+    { "name": "대한항공", "category": "여행", "aliases": ["koreanair"] },
+    { "name": "아시아나항공", "category": "여행", "aliases": ["아시아나", "asiana"] },
+    { "name": "제주항공", "category": "여행", "aliases": ["jejuair"] },
+    { "name": "야놀자", "category": "여행", "aliases": ["yanolja"] },
+    { "name": "여기어때", "category": "여행", "aliases": ["goodchoice"] },
+    { "name": "에어비앤비", "category": "여행", "aliases": ["airbnb"] },
+    { "name": "아고다", "category": "여행", "aliases": ["agoda"] },
+
+    { "name": "SK텔레콤", "category": "통신", "aliases": ["skt", "sk텔레콤요금"] },
+    { "name": "KT", "category": "통신", "aliases": ["케이티", "올레"] },
+    { "name": "LG유플러스", "category": "통신", "aliases": ["lgu+", "엘지유플러스", "유플러스"] },
+
+    { "name": "GS칼텍스", "category": "주유", "aliases": ["gscaltex"] },
+    { "name": "S-OIL", "category": "주유", "aliases": ["에쓰오일"] },
+    { "name": "현대오일뱅크", "category": "주유", "aliases": ["오일뱅크", "현대오일"] },
+    { "name": "SK에너지", "category": "주유", "aliases": ["sk주유소", "sk엔크린"] },
+
+    { "name": "CGV", "category": "문화/여가", "aliases": ["씨지브이", "cj cgv"] },
+    { "name": "롯데시네마", "category": "문화/여가", "aliases": ["lottecinema"] },
+    { "name": "메가박스", "category": "문화/여가", "aliases": ["megabox"] },
+    { "name": "넷플릭스", "category": "문화/여가", "aliases": ["netflix"] },
+    { "name": "유튜브프리미엄", "category": "문화/여가", "aliases": ["youtubepremium", "유튜브"] },
+    { "name": "왓챠", "category": "문화/여가", "aliases": ["watcha"] },
+    { "name": "티빙", "category": "문화/여가", "aliases": ["tving"] },
+    { "name": "웨이브", "category": "문화/여가", "aliases": ["wavve"] },
+    { "name": "디즈니플러스", "category": "문화/여가", "aliases": ["disneyplus", "디즈니+"] },
+    { "name": "멜론", "category": "문화/여가", "aliases": ["melon", "카카오멜론"] },
+    { "name": "지니뮤직", "category": "문화/여가", "aliases": ["genie", "지니"] },
+    { "name": "스포티파이", "category": "문화/여가", "aliases": ["spotify"] },
+    { "name": "에버랜드", "category": "문화/여가", "aliases": ["everland"] },
+    { "name": "롯데월드", "category": "문화/여가", "aliases": ["lotteworld"] }
+  ],
+  "cards": [
+    {
+      "id": "11111111-0001-0001-0001-000000000001",
+      "name": "Deep Dream 카드",
+      "issuer": "신한카드",
+      "card_type": "credit_card",
+      "benefits": [
+        { "title": "전 가맹점 0.7% 적립", "target": { "type": "all" }, "benefit_type": "points", "rate": 0.7, "requires_performance": false },
+        { "title": "DREAM 할인점/편의점 2.1% 적립", "target": { "type": "category", "category": "쇼핑" }, "benefit_type": "points", "rate": 2.1, "monthly_cap": 10000, "requires_performance": true },
+        { "title": "DREAM 영화/커피 2.1% 적립", "target": { "type": "merchant", "merchants": ["스타벅스", "이디야커피", "투썸플레이스", "CGV", "롯데시네마", "메가박스"] }, "benefit_type": "points", "rate": 2.1, "monthly_cap": 10000, "requires_performance": true },
+        { "title": "DREAM 이동통신 2.1% 적립", "target": { "type": "category", "category": "통신" }, "benefit_type": "points", "rate": 2.1, "monthly_cap": 10000, "requires_performance": true }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000002",
+      "name": "Mr.Life 카드",
+      "issuer": "신한카드",
+      "card_type": "credit_card",
+      "benefits": [
+        { "title": "병원/약국 10% 할인", "target": { "type": "category", "category": "의료" }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 5000, "requires_performance": true },
+        { "title": "식음료 야간 10% 할인", "target": { "type": "category", "category": "식비" }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 10000, "requires_performance": true },
+        { "title": "대형마트 주말 10% 할인", "target": { "type": "merchant", "merchants": ["이마트", "홈플러스", "롯데마트"] }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 5000, "requires_performance": true },
+        { "title": "통신요금 10% 할인", "target": { "type": "category", "category": "통신" }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 5000, "requires_performance": true }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000003",
+      "name": "노리2 체크카드",
+      "issuer": "KB국민카드",
+      "card_type": "debit_card",
+      "benefits": [
+        { "title": "커피 10% 할인", "target": { "type": "merchant", "merchants": ["스타벅스", "이디야커피", "투썸플레이스", "할리스", "커피빈"] }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 5000, "requires_performance": true },
+        { "title": "문화 10% 할인", "target": { "type": "category", "category": "문화/여가" }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 5000, "requires_performance": true },
+        { "title": "이동통신 10% 할인", "target": { "type": "category", "category": "통신" }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 5000, "requires_performance": true },
+        { "title": "편의점 5% 할인", "target": { "type": "merchant", "merchants": ["GS25", "CU", "세븐일레븐", "이마트24"] }, "benefit_type": "cashback", "rate": 5.0, "monthly_cap": 3000, "requires_performance": true }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000004",
+      "name": "탄탄대로 올쇼핑 티타늄카드",
+      "issuer": "KB국민카드",
+      "card_type": "credit_card",
+      "benefits": [
+        { "title": "쇼핑영역 10% 할인", "target": { "type": "category", "category": "쇼핑" }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 20000, "requires_performance": true },
+        { "title": "자동납부 10% 할인", "target": { "type": "category", "category": "통신" }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 10000, "requires_performance": true },
+        { "title": "편의점/커피 5% 할인", "target": { "type": "merchant", "merchants": ["GS25", "CU", "세븐일레븐", "스타벅스", "이디야커피"] }, "benefit_type": "cashback", "rate": 5.0, "monthly_cap": 10000, "requires_performance": true },
+        { "title": "주유 리터당 100원 할인", "target": { "type": "category", "category": "주유" }, "benefit_type": "cashback", "rate": 6.0, "monthly_cap": 10000, "min_amount": 30000, "requires_performance": true }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000005",
+      "name": "taptap O 카드",
+      "issuer": "삼성카드",
+      "card_type": "credit_card",
+      "benefits": [
+        { "title": "스타벅스 50% 할인 (패키지 택1)", "target": { "type": "merchant", "merchants": ["스타벅스"] }, "benefit_type": "cashback", "rate": 50.0, "monthly_cap": 10000, "requires_performance": true },
+        { "title": "커피전문점 30% 할인 (패키지 택1)", "target": { "type": "merchant", "merchants": ["이디야커피", "투썸플레이스", "할리스", "커피빈", "메가커피", "빽다방"] }, "benefit_type": "cashback", "rate": 30.0, "monthly_cap": 10000, "requires_performance": true },
+        { "title": "온라인쇼핑 7% 할인", "target": { "type": "category", "category": "쇼핑" }, "benefit_type": "cashback", "rate": 7.0, "monthly_cap": 5000, "requires_performance": true },
+        { "title": "대중교통/택시 10% 할인", "target": { "type": "category", "category": "교통" }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 5000, "requires_performance": true },
+        { "title": "이동통신 10% 할인", "target": { "type": "category", "category": "통신" }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 5000, "requires_performance": true },
+        { "title": "영화 5,000원 할인", "target": { "type": "merchant", "merchants": ["CGV", "롯데시네마"] }, "benefit_type": "discount", "flat_amount": 5000, "monthly_cap": 10000, "min_amount": 10000, "requires_performance": true }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000006",
+      "name": "iD SIMPLE 카드",
+      "issuer": "삼성카드",
+      "card_type": "credit_card",
+      "benefits": [
+        { "title": "전 가맹점 0.7% 할인", "target": { "type": "all" }, "benefit_type": "cashback", "rate": 0.7, "requires_performance": false },
+        { "title": "영화 3,000원 할인", "target": { "type": "merchant", "merchants": ["CGV", "롯데시네마", "메가박스"] }, "benefit_type": "discount", "flat_amount": 3000, "monthly_cap": 3000, "min_amount": 10000, "requires_performance": false }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000007",
+      "name": "ZERO Edition2 카드 (할인형)",
+      "issuer": "현대카드",
+      "card_type": "credit_card",
+      "benefits": [
+        { "title": "전 가맹점 0.7% 할인", "target": { "type": "all" }, "benefit_type": "cashback", "rate": 0.7, "requires_performance": false },
+        { "title": "음식점/커피 1.5% 할인", "target": { "type": "category", "category": "식비" }, "benefit_type": "cashback", "rate": 1.5, "requires_performance": false },
+        { "title": "대중교통 1.5% 할인", "target": { "type": "category", "category": "교통" }, "benefit_type": "cashback", "rate": 1.5, "requires_performance": false },
+        { "title": "편의점/할인점 1.5% 할인", "target": { "type": "category", "category": "쇼핑" }, "benefit_type": "cashback", "rate": 1.5, "requires_performance": false }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000008",
+      "name": "M Edition2 카드",
+      "issuer": "현대카드",
+      "card_type": "credit_card",
+      "benefits": [
+        { "title": "기본 0.5% M포인트 적립", "target": { "type": "all" }, "benefit_type": "points", "rate": 0.5, "requires_performance": false },
+        { "title": "일상/라이프 교통 2% 적립", "target": { "type": "category", "category": "교통" }, "benefit_type": "points", "rate": 2.0, "requires_performance": true },
+        { "title": "일상/라이프 영화/서점 2% 적립", "target": { "type": "category", "category": "문화/여가" }, "benefit_type": "points", "rate": 2.0, "requires_performance": true },
+        { "title": "외식 0.7% 적립", "target": { "type": "category", "category": "식비" }, "benefit_type": "points", "rate": 0.7, "requires_performance": true },
+        { "title": "GS칼텍스 리터당 60 M포인트", "target": { "type": "merchant", "merchants": ["GS칼텍스"] }, "benefit_type": "points", "rate": 3.5, "requires_performance": true }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000009",
+      "name": "1Q Daily+ 카드",
+      "issuer": "하나카드",
+      "card_type": "credit_card",
+      "benefits": [
+        { "title": "전 가맹점 1% 하나머니 적립", "target": { "type": "all" }, "benefit_type": "points", "rate": 1.0, "requires_performance": true },
+        { "title": "SK주유 3,000원 할인", "target": { "type": "merchant", "merchants": ["SK에너지"] }, "benefit_type": "discount", "flat_amount": 3000, "monthly_cap": 6000, "min_amount": 50000, "requires_performance": true },
+        { "title": "커피 4,000원 무료", "target": { "type": "merchant", "merchants": ["스타벅스", "커피빈"] }, "benefit_type": "free", "flat_amount": 4000, "monthly_cap": 4000, "min_amount": 4000, "requires_performance": true }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000010",
+      "name": "카드의정석 DISCOUNT 카드",
+      "issuer": "우리카드",
+      "card_type": "credit_card",
+      "benefits": [
+        { "title": "전 가맹점 0.7% 할인", "target": { "type": "all" }, "benefit_type": "cashback", "rate": 0.7, "requires_performance": false }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000011",
+      "name": "LOCA 365 카드",
+      "issuer": "롯데카드",
+      "card_type": "credit_card",
+      "benefits": [
+        { "title": "대중교통 10% 할인", "target": { "type": "category", "category": "교통" }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 5000, "min_amount": 20000, "requires_performance": true },
+        { "title": "이동통신 10% 할인", "target": { "type": "category", "category": "통신" }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 5000, "min_amount": 20000, "requires_performance": true },
+        { "title": "배달앱 10% 할인", "target": { "type": "merchant", "merchants": ["배달의민족", "요기요", "쿠팡이츠"] }, "benefit_type": "cashback", "rate": 10.0, "monthly_cap": 5000, "min_amount": 20000, "requires_performance": true },
+        { "title": "스트리밍 1,500원 할인", "target": { "type": "merchant", "merchants": ["넷플릭스", "유튜브프리미엄", "왓챠", "티빙", "웨이브", "디즈니플러스"] }, "benefit_type": "discount", "flat_amount": 1500, "monthly_cap": 1500, "requires_performance": true }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000012",
+      "name": "바로 리워드 플러스 카드",
+      "issuer": "BC카드",
+      "card_type": "credit_card",
+      "benefits": [
+        { "title": "기본 1% 페이북머니 적립", "target": { "type": "all" }, "benefit_type": "points", "rate": 1.0, "requires_performance": false },
+        { "title": "문화 30% 적립", "target": { "type": "category", "category": "문화/여가" }, "benefit_type": "points", "rate": 30.0, "monthly_cap": 10000, "requires_performance": true },
+        { "title": "쇼핑 5% 적립", "target": { "type": "category", "category": "쇼핑" }, "benefit_type": "points", "rate": 5.0, "monthly_cap": 10000, "requires_performance": true },
+        { "title": "교통/주유 5% 적립", "target": { "type": "category", "category": "교통" }, "benefit_type": "points", "rate": 5.0, "monthly_cap": 10000, "requires_performance": true }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000013",
+      "name": "토스 신용카드",
+      "issuer": "하나카드",
+      "card_type": "credit_card",
+      "benefits": [
+        { "title": "오프라인 0.5% 토스포인트 적립", "target": { "type": "all" }, "benefit_type": "cashback", "rate": 0.5, "requires_performance": false },
+        { "title": "배달의민족 5% 적립", "target": { "type": "merchant", "merchants": ["배달의민족"] }, "benefit_type": "cashback", "rate": 5.0, "monthly_cap": 7500, "requires_performance": true },
+        { "title": "토스쇼핑/쿠페이 5% 적립", "target": { "type": "category", "category": "쇼핑" }, "benefit_type": "cashback", "rate": 5.0, "monthly_cap": 7500, "requires_performance": true },
+        { "title": "해외결제 2% 적립", "target": { "type": "category", "category": "여행" }, "benefit_type": "cashback", "rate": 2.0, "monthly_cap": 10000, "requires_performance": true }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000014",
+      "name": "프렌즈 체크카드",
+      "issuer": "카카오뱅크",
+      "card_type": "debit_card",
+      "benefits": [
+        { "title": "기본 0.3% 캐시백", "target": { "type": "all" }, "benefit_type": "cashback", "rate": 0.3, "requires_performance": false },
+        { "title": "후불교통 4,000원 캐시백", "target": { "type": "category", "category": "교통" }, "benefit_type": "discount", "flat_amount": 4000, "monthly_cap": 4000, "min_amount": 50000, "requires_performance": true }
+      ]
+    },
+    {
+      "id": "11111111-0001-0001-0001-000000000015",
+      "name": "토스뱅크 체크카드",
+      "issuer": "토스뱅크",
+      "card_type": "debit_card",
+      "benefits": [
+        { "title": "음식&음료 건당 500원 캐시백", "target": { "type": "category", "category": "식비" }, "benefit_type": "discount", "flat_amount": 500, "monthly_cap": 5000, "min_amount": 10000, "requires_performance": false },
+        { "title": "대중교통 건당 100원 캐시백", "target": { "type": "category", "category": "교통" }, "benefit_type": "discount", "flat_amount": 100, "monthly_cap": 5000, "min_amount": 100, "requires_performance": false },
+        { "title": "편의점/마트 건당 500원 캐시백", "target": { "type": "category", "category": "쇼핑" }, "benefit_type": "discount", "flat_amount": 500, "monthly_cap": 5000, "min_amount": 10000, "requires_performance": false },
+        { "title": "영화관 건당 500원 캐시백", "target": { "type": "merchant", "merchants": ["CGV", "롯데시네마", "메가박스"] }, "benefit_type": "discount", "flat_amount": 500, "monthly_cap": 5000, "min_amount": 10000, "requires_performance": false }
+      ]
+    }
+  ]
+}

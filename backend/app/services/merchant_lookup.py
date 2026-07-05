@@ -8,8 +8,11 @@ import os
 
 import httpx
 
-# Internal category list
-INTERNAL_CATEGORIES = ["식비", "교통", "쇼핑", "의료", "여행", "통신", "주유", "문화/여가", "전체"]
+from app.constants import BENEFIT_CATEGORIES
+
+# Internal category list — 단일 출처는 app.constants.BENEFIT_CATEGORIES.
+# "전체"는 카테고리가 아닌 benefit.target_type="all"로 흡수되었다.
+INTERNAL_CATEGORIES = list(BENEFIT_CATEGORIES)
 
 # Naver category keyword → internal category mapping
 _NAVER_CATEGORY_MAP: dict[str, str] = {
