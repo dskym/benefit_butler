@@ -1,5 +1,5 @@
 // frontend/src/screens/settings/CardListScreen.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useCardStore } from "../../store/cardStore";
-import { UserCard } from "../../types";
+import { CardCatalog, UserCard } from "../../types";
 import { theme } from "../../theme";
 import {
   Button,
@@ -40,6 +40,7 @@ interface CardFormFields {
   type: CardType;
   monthly_target: string;
   billing_day: string;
+  catalog_id: string | null;
 }
 
 // ── 추가 모달 ──────────────────────────────────────────────
@@ -51,19 +52,44 @@ interface AddModalProps {
 }
 
 function AddModal({ visible, onClose, onSubmit }: AddModalProps) {
+  const { catalogResults, isSearchingCatalog, searchCatalog, clearCatalogResults } = useCardStore();
   const [fields, setFields] = useState<CardFormFields>({
     name: "",
     type: "credit_card",
     monthly_target: "",
     billing_day: "",
+    catalog_id: null,
   });
+  const [selectedCatalog, setSelectedCatalog] = useState<CardCatalog | null>(null);
   const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (visible) {
-      setFields({ name: "", type: "credit_card", monthly_target: "", billing_day: "" });
+      setFields({ name: "", type: "credit_card", monthly_target: "", billing_day: "", catalog_id: null });
+      setSelectedCatalog(null);
+      clearCatalogResults();
     }
-  }, [visible]);
+  }, [visible, clearCatalogResults]);
+
+  // 카드 이름 입력 → 디바운스 카탈로그 검색 (카탈로그 미선택 상태에서만)
+  const handleNameChange = (v: string) => {
+    setFields((f) => ({ ...f, name: v, catalog_id: null }));
+    setSelectedCatalog(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => searchCatalog(v), 400);
+  };
+
+  const handleSelectCatalog = (catalog: CardCatalog) => {
+    setSelectedCatalog(catalog);
+    setFields((f) => ({
+      ...f,
+      name: catalog.name,
+      type: catalog.card_type,
+      catalog_id: catalog.id,
+    }));
+    clearCatalogResults();
+  };
 
   const handleSubmit = async () => {
     if (!fields.name.trim()) {
@@ -86,11 +112,54 @@ function AddModal({ visible, onClose, onSubmit }: AddModalProps) {
       <TextInputField
         label="카드 이름"
         value={fields.name}
-        onChangeText={(v) => setFields((f) => ({ ...f, name: v }))}
-        placeholder="예: 신한 SOL 체크카드"
+        onChangeText={handleNameChange}
+        placeholder="예: 신한 SOL 체크카드 (검색하면 카탈로그에서 찾아드려요)"
         autoFocus
         accessibilityLabel="카드 이름 입력"
       />
+
+      {/* 카탈로그 검색 결과 */}
+      {isSearchingCatalog && <ActivityIndicator size="small" color={theme.colors.primary} />}
+      {catalogResults.length > 0 && !selectedCatalog && (
+        <View style={styles.catalogResults}>
+          {catalogResults.slice(0, 5).map((catalog) => (
+            <TouchableOpacity
+              key={catalog.id}
+              style={styles.catalogItem}
+              onPress={() => handleSelectCatalog(catalog)}
+              accessibilityLabel={`카탈로그 카드 선택: ${catalog.name}`}
+            >
+              <Ionicons name="card" size={16} color={theme.colors.primary} style={{ marginRight: 8 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.catalogName}>{catalog.name}</Text>
+                <Text style={styles.catalogSub}>
+                  {catalog.issuer} · {TYPE_LABELS[catalog.card_type]} · 혜택 {catalog.benefits.length}개
+                </Text>
+              </View>
+              <Ionicons name="add-circle-outline" size={18} color={theme.colors.primary} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {/* 선택된 카탈로그 안내 */}
+      {selectedCatalog && (
+        <View style={styles.catalogSelected}>
+          <Ionicons name="checkmark-circle" size={16} color={theme.colors.income} />
+          <Text style={styles.catalogSelectedText}>
+            {selectedCatalog.issuer} {selectedCatalog.name} — 혜택 {selectedCatalog.benefits.length}개 자동 연결
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedCatalog(null);
+              setFields((f) => ({ ...f, catalog_id: null }));
+            }}
+            accessibilityLabel="카탈로그 연결 해제"
+          >
+            <Ionicons name="close-circle" size={16} color={theme.colors.text.hint} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       <Text style={styles.label}>종류</Text>
       <View style={styles.typeRow}>
@@ -243,6 +312,7 @@ export default function CardListScreen() {
       name: fields.name.trim(),
       monthly_target: targetRaw ? parseInt(targetRaw, 10) : null,
       billing_day: billingRaw ? Math.min(28, Math.max(1, parseInt(billingRaw, 10))) : null,
+      catalog_id: fields.catalog_id,
     });
   };
 
@@ -403,4 +473,33 @@ const styles = StyleSheet.create({
   },
   typeBtnText: { fontSize: 14, color: theme.colors.text.secondary },
   sheetActions: { flexDirection: "row", gap: 10, marginTop: 24, marginBottom: 8 },
+  catalogResults: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    marginTop: 4,
+    overflow: "hidden",
+  },
+  catalogItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.bg,
+  },
+  catalogName: { fontSize: 14, color: theme.colors.text.primary, fontWeight: "500" },
+  catalogSub: { fontSize: 11, color: theme.colors.text.hint, marginTop: 1 },
+  catalogSelected: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: theme.radius.sm,
+    backgroundColor: "#E8F5E9",
+  },
+  catalogSelectedText: { flex: 1, fontSize: 12, fontWeight: "600", color: "#2E7D32" },
 });

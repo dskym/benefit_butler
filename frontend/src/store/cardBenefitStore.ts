@@ -1,26 +1,34 @@
 // frontend/src/store/cardBenefitStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { UserCardBenefit } from "../types";
+import { BenefitTargetType, UserCardBenefit } from "../types";
 import { apiClient } from "../services/api";
 import { createPlatformStorage } from "../storage";
 
 interface BenefitCreate {
-  category: string;
+  title?: string | null;
+  target_type: BenefitTargetType;
+  category?: string | null;      // target_type="category"일 때 필수
+  merchant_names?: string[];     // target_type="merchant"일 때 필수
   benefit_type: "cashback" | "points" | "discount" | "free";
   rate?: number | null;
   flat_amount?: number | null;
   monthly_cap?: number | null;
   min_amount?: number | null;
+  requires_performance?: boolean;
 }
 
 interface BenefitUpdate {
-  category?: string;
+  title?: string | null;
+  target_type?: BenefitTargetType;
+  category?: string | null;
+  merchant_names?: string[];
   benefit_type?: "cashback" | "points" | "discount" | "free";
   rate?: number | null;
   flat_amount?: number | null;
   monthly_cap?: number | null;
   min_amount?: number | null;
+  requires_performance?: boolean;
 }
 
 interface CardBenefitState {

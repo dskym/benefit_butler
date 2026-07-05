@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -17,11 +18,16 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useCardStore } from "../../store/cardStore";
 import { useCardBenefitStore } from "../../store/cardBenefitStore";
-import { UserCard, UserCardBenefit } from "../../types";
+import { BenefitTargetType, UserCard, UserCardBenefit } from "../../types";
 import { theme } from "../../theme";
 import { formatWithCommas, stripCommas } from "../../utils/formatCurrency";
+import { BENEFIT_CATEGORIES } from "../../utils/benefitCategories";
 
-const CATEGORIES = ["전체", "식비", "교통", "쇼핑", "의료", "여행", "통신", "주유", "문화/여가"];
+const TARGET_TYPES: { value: BenefitTargetType; label: string }[] = [
+  { value: "all", label: "전 가맹점" },
+  { value: "category", label: "카테고리" },
+  { value: "merchant", label: "가맹점 지정" },
+];
 const BENEFIT_TYPES = [
   { value: "cashback", label: "캐시백" },
   { value: "points", label: "포인트" },
@@ -34,21 +40,29 @@ type BenefitType = "cashback" | "points" | "discount" | "free";
 // ── 혜택 추가/수정 모달 ────────────────────────────────────
 
 interface BenefitFields {
+  title: string;
+  target_type: BenefitTargetType;
   category: string;
+  merchant_names: string;   // 콤마 구분 입력
   benefit_type: BenefitType;
   rate: string;
   flat_amount: string;
   monthly_cap: string;
   min_amount: string;
+  requires_performance: boolean;
 }
 
 const DEFAULT_FIELDS: BenefitFields = {
-  category: "전체",
+  title: "",
+  target_type: "all",
+  category: "식비",
+  merchant_names: "",
   benefit_type: "cashback",
   rate: "",
   flat_amount: "",
   monthly_cap: "",
   min_amount: "",
+  requires_performance: false,
 };
 
 interface BenefitModalProps {
@@ -66,12 +80,16 @@ function BenefitModal({ visible, editing, onClose, onSubmit }: BenefitModalProps
     if (visible) {
       if (editing) {
         setFields({
-          category: editing.category,
+          title: editing.title ?? "",
+          target_type: editing.target_type,
+          category: editing.category ?? "식비",
+          merchant_names: (editing.merchant_names ?? []).join(", "),
           benefit_type: editing.benefit_type as BenefitType,
           rate: editing.rate !== null ? String(editing.rate) : "",
           flat_amount: editing.flat_amount !== null ? String(editing.flat_amount) : "",
           monthly_cap: editing.monthly_cap !== null ? String(editing.monthly_cap) : "",
           min_amount: editing.min_amount !== null ? String(editing.min_amount) : "",
+          requires_performance: editing.requires_performance ?? false,
         });
       } else {
         setFields(DEFAULT_FIELDS);
@@ -82,6 +100,10 @@ function BenefitModal({ visible, editing, onClose, onSubmit }: BenefitModalProps
   const needsRate = fields.benefit_type === "cashback" || fields.benefit_type === "points";
 
   const handleSubmit = async () => {
+    if (fields.target_type === "merchant" && !fields.merchant_names.trim()) {
+      Alert.alert("오류", "가맹점명을 입력해주세요. (콤마로 여러 개 입력 가능)");
+      return;
+    }
     if (needsRate && !fields.rate.trim()) {
       Alert.alert("오류", "적립률(%)을 입력해주세요.");
       return;
@@ -108,24 +130,71 @@ function BenefitModal({ visible, editing, onClose, onSubmit }: BenefitModalProps
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={styles.sheetTitle}>{editing ? "혜택 수정" : "혜택 추가"}</Text>
 
-            {/* 카테고리 */}
-            <Text style={styles.label}>카테고리</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
-              <View style={styles.chipRow}>
-                {CATEGORIES.map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[styles.chip, fields.category === cat && styles.chipActive]}
-                    onPress={() => setFields((f) => ({ ...f, category: cat }))}
-                    accessibilityLabel={`카테고리: ${cat}`}
-                  >
-                    <Text style={[styles.chipText, fields.category === cat && styles.chipTextActive]}>
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+            {/* 혜택 이름 (선택) */}
+            <Text style={styles.label}>혜택 이름 (선택)</Text>
+            <TextInput
+              style={styles.input}
+              value={fields.title}
+              onChangeText={(v) => setFields((f) => ({ ...f, title: v }))}
+              placeholder="예: 커피전문점 10% 할인"
+              placeholderTextColor={theme.colors.text.hint}
+              accessibilityLabel="혜택 이름 입력"
+            />
+
+            {/* 적용 대상 */}
+            <Text style={styles.label}>적용 대상</Text>
+            <View style={styles.typeRow}>
+              {TARGET_TYPES.map(({ value, label }) => (
+                <TouchableOpacity
+                  key={value}
+                  style={[styles.typeBtn, fields.target_type === value && styles.typeBtnActive]}
+                  onPress={() => setFields((f) => ({ ...f, target_type: value }))}
+                  accessibilityLabel={`적용 대상: ${label}`}
+                >
+                  <Text style={[styles.typeBtnText, fields.target_type === value && styles.typeBtnTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* 카테고리 (target=category) */}
+            {fields.target_type === "category" && (
+              <>
+                <Text style={styles.label}>카테고리</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+                  <View style={styles.chipRow}>
+                    {BENEFIT_CATEGORIES.map((cat) => (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[styles.chip, fields.category === cat && styles.chipActive]}
+                        onPress={() => setFields((f) => ({ ...f, category: cat }))}
+                        accessibilityLabel={`카테고리: ${cat}`}
+                      >
+                        <Text style={[styles.chipText, fields.category === cat && styles.chipTextActive]}>
+                          {cat}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </>
+            )}
+
+            {/* 가맹점 목록 (target=merchant) */}
+            {fields.target_type === "merchant" && (
+              <>
+                <Text style={styles.label}>가맹점명 (콤마로 구분)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={fields.merchant_names}
+                  onChangeText={(v) => setFields((f) => ({ ...f, merchant_names: v }))}
+                  placeholder="예: 스타벅스, 이디야커피"
+                  placeholderTextColor={theme.colors.text.hint}
+                  accessibilityLabel="가맹점명 입력"
+                />
+              </>
+            )}
 
             {/* 혜택 유형 */}
             <Text style={styles.label}>혜택 유형</Text>
@@ -197,6 +266,20 @@ function BenefitModal({ visible, editing, onClose, onSubmit }: BenefitModalProps
               accessibilityLabel="최소 결제 금액 입력"
             />
 
+            {/* 전월 실적 조건 */}
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.label, { marginTop: 0 }]}>전월 실적 조건</Text>
+                <Text style={styles.switchHint}>카드 실적 목표를 채웠을 때만 적용되는 혜택</Text>
+              </View>
+              <Switch
+                value={fields.requires_performance}
+                onValueChange={(v) => setFields((f) => ({ ...f, requires_performance: v }))}
+                trackColor={{ true: theme.colors.primary }}
+                accessibilityLabel="전월 실적 조건"
+              />
+            </View>
+
             <View style={styles.actions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={onClose} accessibilityLabel="취소">
                 <Text style={styles.cancelBtnText}>취소</Text>
@@ -239,21 +322,33 @@ function BenefitRow({ benefit, onEdit, onDelete }: BenefitRowProps) {
 
   const capText = benefit.monthly_cap ? ` · 월 최대 ${benefit.monthly_cap.toLocaleString("ko-KR")}원` : "";
 
+  const targetText =
+    benefit.target_type === "merchant"
+      ? benefit.merchant_names.slice(0, 2).join("/") +
+        (benefit.merchant_names.length > 2 ? ` 외 ${benefit.merchant_names.length - 2}` : "")
+      : benefit.target_type === "category"
+        ? (benefit.category ?? "")
+        : "전체";
+
+  const conditions = [
+    benefit.min_amount ? `${benefit.min_amount.toLocaleString("ko-KR")}원 이상 결제 시` : null,
+    benefit.requires_performance ? "전월 실적 조건" : null,
+  ].filter(Boolean);
+
   return (
     <View style={styles.benefitRow}>
       <View style={styles.benefitInfo}>
-        <View style={styles.benefitChip}>
-          <Text style={styles.benefitChipText}>{benefit.category}</Text>
+        <View style={[styles.benefitChip, benefit.target_type === "merchant" && styles.benefitChipMerchant]}>
+          <Text style={styles.benefitChipText}>{targetText}</Text>
         </View>
         <View style={{ flex: 1, marginLeft: 8 }}>
+          {benefit.title ? <Text style={styles.benefitTitleText}>{benefit.title}</Text> : null}
           <Text style={styles.benefitValueText}>
             {typeLabel[benefit.benefit_type]} {valueText}
             {capText}
           </Text>
-          {benefit.min_amount ? (
-            <Text style={styles.benefitSubText}>
-              {benefit.min_amount.toLocaleString("ko-KR")}원 이상 결제 시
-            </Text>
+          {conditions.length > 0 ? (
+            <Text style={styles.benefitSubText}>{conditions.join(" · ")}</Text>
           ) : null}
         </View>
       </View>
@@ -343,12 +438,19 @@ export default function CardBenefitEditScreen() {
   const handleSubmit = async (fields: BenefitFields) => {
     if (!selectedCardId) return;
     const payload = {
-      category: fields.category,
+      title: fields.title.trim() || null,
+      target_type: fields.target_type,
+      category: fields.target_type === "category" ? fields.category : null,
+      merchant_names:
+        fields.target_type === "merchant"
+          ? fields.merchant_names.split(",").map((s) => s.trim()).filter(Boolean)
+          : [],
       benefit_type: fields.benefit_type,
       rate: fields.rate.trim() ? parseFloat(fields.rate) : null,
       flat_amount: fields.flat_amount.trim() ? parseInt(fields.flat_amount, 10) : null,
       monthly_cap: fields.monthly_cap.trim() ? parseInt(fields.monthly_cap, 10) : null,
       min_amount: fields.min_amount.trim() ? parseInt(fields.min_amount, 10) : null,
+      requires_performance: fields.requires_performance,
     };
     if (editingBenefit) {
       await updateBenefit(selectedCardId, editingBenefit.id, payload);
@@ -518,9 +620,18 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     alignSelf: "flex-start",
   },
+  benefitChipMerchant: { backgroundColor: "#E3F2FD" },
   benefitChipText: { fontSize: 12, color: theme.colors.primary, fontWeight: "600" },
+  benefitTitleText: { fontSize: 12, color: theme.colors.text.secondary, marginBottom: 2 },
   benefitValueText: { fontSize: 14, fontWeight: "600", color: theme.colors.text.primary },
   benefitSubText: { fontSize: 12, color: theme.colors.text.hint, marginTop: 2 },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 14,
+    gap: 8,
+  },
+  switchHint: { fontSize: 11, color: theme.colors.text.hint, marginTop: 2 },
   benefitActions: { flexDirection: "row", alignItems: "center" },
   // emptyBenefits/emptyBenefitsText styles removed — unified empty state pattern uses inline styles
   fab: {
