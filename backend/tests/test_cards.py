@@ -353,3 +353,89 @@ def test_performance_boundary_billing_days(client, auth_headers):
     assert len(items) == 2
     billing_days = {item["billing_day"] for item in items}
     assert billing_days == {1, 28}
+
+
+# ── catalog link (혜택 스냅샷 복사) ───────────────────────────────────────────
+
+
+def _seed_catalog(client):
+    from app.core.database import SessionLocal
+    from app.services.catalog_seed import load_catalog_seed
+
+    db = SessionLocal()
+    try:
+        load_catalog_seed(db)
+    finally:
+        db.close()
+
+
+DEEP_DREAM_ID = "11111111-0001-0001-0001-000000000001"  # 혜택 4건
+DISCOUNT_ID = "11111111-0001-0001-0001-000000000010"    # 혜택 1건 (전 가맹점 0.7%)
+
+
+def test_create_card_with_catalog_copies_benefits(client, auth_headers):
+    _seed_catalog(client)
+    card = create_card(client, auth_headers, {
+        "type": "credit_card", "name": "딥드림", "catalog_id": DEEP_DREAM_ID,
+    })
+    assert card["catalog_id"] == DEEP_DREAM_ID
+    benefits = client.get(f"/api/v1/cards/{card['id']}/benefits", headers=auth_headers).json()
+    assert len(benefits) == 4
+    merchant_benefit = next(b for b in benefits if b["target_type"] == "merchant")
+    assert "스타벅스" in merchant_benefit["merchant_names"]  # 가맹점 타겟까지 복사됨
+    assert any(b["target_type"] == "all" for b in benefits)
+
+
+def test_create_card_without_catalog_has_no_benefits(client, auth_headers):
+    card = create_card(client, auth_headers)
+    assert card["catalog_id"] is None
+    benefits = client.get(f"/api/v1/cards/{card['id']}/benefits", headers=auth_headers).json()
+    assert benefits == []
+
+
+def test_create_card_with_unknown_catalog_returns_404(client, auth_headers):
+    resp = client.post("/api/v1/cards/", headers=auth_headers, json={
+        "type": "credit_card", "name": "유령", "catalog_id": "00000000-0000-0000-0000-000000000000",
+    })
+    assert resp.status_code == 404
+
+
+def test_update_card_reconnect_catalog_replaces_benefits(client, auth_headers):
+    _seed_catalog(client)
+    card = create_card(client, auth_headers, {
+        "type": "credit_card", "name": "카드", "catalog_id": DEEP_DREAM_ID,
+    })
+    resp = client.patch(f"/api/v1/cards/{card['id']}", headers=auth_headers, json={
+        "catalog_id": DISCOUNT_ID,
+    })
+    assert resp.status_code == 200
+    assert resp.json()["catalog_id"] == DISCOUNT_ID
+    benefits = client.get(f"/api/v1/cards/{card['id']}/benefits", headers=auth_headers).json()
+    assert len(benefits) == 1  # 4건 → 1건으로 교체
+
+
+def test_update_card_disconnect_catalog_clears_benefits(client, auth_headers):
+    _seed_catalog(client)
+    card = create_card(client, auth_headers, {
+        "type": "credit_card", "name": "카드", "catalog_id": DEEP_DREAM_ID,
+    })
+    resp = client.patch(f"/api/v1/cards/{card['id']}", headers=auth_headers, json={"catalog_id": None})
+    assert resp.status_code == 200
+    assert resp.json()["catalog_id"] is None
+    benefits = client.get(f"/api/v1/cards/{card['id']}/benefits", headers=auth_headers).json()
+    assert benefits == []
+
+
+def test_update_card_without_catalog_field_keeps_benefits(client, auth_headers):
+    """catalog_id를 보내지 않는 PATCH는 혜택을 건드리지 않는다."""
+    _seed_catalog(client)
+    card = create_card(client, auth_headers, {
+        "type": "credit_card", "name": "카드", "catalog_id": DEEP_DREAM_ID,
+    })
+    resp = client.patch(f"/api/v1/cards/{card['id']}", headers=auth_headers, json={
+        "monthly_target": 300000,
+    })
+    assert resp.status_code == 200
+    assert resp.json()["catalog_id"] == DEEP_DREAM_ID
+    benefits = client.get(f"/api/v1/cards/{card['id']}/benefits", headers=auth_headers).json()
+    assert len(benefits) == 4

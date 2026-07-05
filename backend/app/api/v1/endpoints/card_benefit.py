@@ -1,14 +1,15 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.auth import get_current_user
 from app.core.database import get_db
-from app.models.card_benefit import UserCardBenefit
+from app.models.card_benefit import UserCardBenefit, UserCardBenefitMerchant
 from app.models.user_card import UserCard
 from app.schemas.card_benefit import UserCardBenefitCreate, UserCardBenefitResponse, UserCardBenefitUpdate
+from app.services.merchant_resolver import get_or_create_merchants
 
 router = APIRouter(prefix="/cards", tags=["card-benefits"])
 
@@ -18,6 +19,14 @@ def _get_owned_card(db: Session, user_id: uuid.UUID, card_id: uuid.UUID) -> User
     if card is None:
         raise HTTPException(status_code=404, detail="Card not found")
     return card
+
+
+def _set_merchant_targets(db: Session, benefit: UserCardBenefit, merchant_names: list[str], category: str | None) -> None:
+    """혜택의 가맹점 타겟을 교체. 미등록 가맹점명은 자동 생성한다."""
+    db.execute(delete(UserCardBenefitMerchant).where(UserCardBenefitMerchant.benefit_id == benefit.id))
+    merchants = get_or_create_merchants(db, merchant_names, default_category=category or "쇼핑")
+    for merchant in merchants:
+        db.add(UserCardBenefitMerchant(benefit_id=benefit.id, merchant_id=merchant.id))
 
 
 @router.get("/{card_id}/benefits", response_model=list[UserCardBenefitResponse])
@@ -44,19 +53,22 @@ def create_benefit(
     db: Session = Depends(get_db),
 ):
     _get_owned_card(db, current_user.id, card_id)
-    # 구 클라이언트 호환: category="전체"는 target_type="all"로 정규화
-    is_all = data.category == "전체"
     benefit = UserCardBenefit(
         user_card_id=card_id,
-        target_type="all" if is_all else "category",
-        category=None if is_all else data.category,
+        title=data.title,
+        target_type=data.target_type,
+        category=data.category,
         benefit_type=data.benefit_type,
         rate=data.rate,
         flat_amount=data.flat_amount,
         monthly_cap=data.monthly_cap,
         min_amount=data.min_amount,
+        requires_performance=data.requires_performance,
     )
     db.add(benefit)
+    db.flush()
+    if data.target_type == "merchant":
+        _set_merchant_targets(db, benefit, data.merchant_names, data.category)
     db.commit()
     db.refresh(benefit)
     return benefit
@@ -79,14 +91,34 @@ def update_benefit(
     )
     if benefit is None:
         raise HTTPException(status_code=404, detail="Benefit not found")
+
     updates = data.model_dump(exclude_unset=True)
+    merchant_names = updates.pop("merchant_names", None)
+
+    # 구 클라이언트 호환: category="전체" → target_type="all"
     if updates.get("category") == "전체":
         updates["category"] = None
         updates["target_type"] = "all"
-    elif updates.get("category"):
+    elif "category" in updates and updates["category"] and "target_type" not in updates:
         updates["target_type"] = "category"
+
     for field, value in updates.items():
         setattr(benefit, field, value)
+
+    # 변경 결과 정합성 검증
+    if benefit.target_type == "category" and not benefit.category:
+        raise HTTPException(status_code=422, detail="target_type='category'는 category가 필요합니다")
+    if benefit.target_type == "merchant":
+        if merchant_names is not None:
+            _set_merchant_targets(db, benefit, merchant_names, benefit.category)
+            db.flush()
+        db.expire(benefit, ["merchants"])
+        if not benefit.merchants:
+            raise HTTPException(status_code=422, detail="target_type='merchant'는 merchant_names가 필요합니다")
+    else:
+        benefit.category = benefit.category if benefit.target_type == "category" else None
+        db.execute(delete(UserCardBenefitMerchant).where(UserCardBenefitMerchant.benefit_id == benefit.id))
+
     db.commit()
     db.refresh(benefit)
     return benefit
