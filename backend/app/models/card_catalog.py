@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -21,4 +21,11 @@ class CardCatalog(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
+    )
+
+    benefits = relationship(
+        "CatalogBenefit",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+        order_by="CatalogBenefit.created_at",
     )

@@ -146,7 +146,7 @@ def recommend_cards(
         if user_benefits:
             # Use only user-defined benefits
             candidate_benefits = [
-                (b.category, b.benefit_type, b.rate, b.flat_amount, b.monthly_cap, b.min_amount)
+                (b.target_type, b.category, b.benefit_type, b.rate, b.flat_amount, b.monthly_cap, b.min_amount)
                 for b in user_benefits
             ]
         elif card.catalog_id:
@@ -157,16 +157,17 @@ def recommend_cards(
                 ).all()
             )
             candidate_benefits = [
-                (b.category, b.benefit_type, b.rate, b.flat_amount, b.monthly_cap, b.min_amount)
+                (b.target_type, b.category, b.benefit_type, b.rate, b.flat_amount, b.monthly_cap, b.min_amount)
                 for b in catalog_benefits
             ]
         else:
             candidate_benefits = []
 
-        # 2. Filter matching benefits
+        # 2. Filter matching benefits — 구 "전체" 카테고리는 target_type="all"로 표현됨.
+        #    merchant 타겟 매칭은 추천 엔진 재작성(PR2)에서 지원한다.
         matching = [
             b for b in candidate_benefits
-            if b[0] == "전체" or (category and b[0] == category)
+            if b[0] == "all" or (category and b[0] == "category" and b[1] == category)
         ]
 
         if not matching:
@@ -177,7 +178,7 @@ def recommend_cards(
         best_value = 0
         best_benefit = None
         for b in matching:
-            b_cat, b_type, b_rate, b_flat, b_cap, b_min = b
+            _, b_cat, b_type, b_rate, b_flat, b_cap, b_min = b
             # Check min_amount condition
             if b_min and amount < b_min:
                 continue
@@ -191,7 +192,9 @@ def recommend_cards(
             # only if there's at least one benefit (skip card entirely if no match)
             continue
 
-        b_cat, b_type, b_rate, b_flat, b_cap, b_min = best_benefit
+        b_target, b_cat, b_type, b_rate, b_flat, b_cap, b_min = best_benefit
+        if b_target == "all":
+            b_cat = "전체"  # 설명 문구용 라벨
 
         # 4. Performance bonus
         perf_remaining: int | None = None

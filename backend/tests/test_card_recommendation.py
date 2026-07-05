@@ -63,17 +63,21 @@ def _insert_catalog_card(name="카탈로그카드", issuer="카탈로그카드�
 
 def _insert_catalog_benefit(catalog_id, category="전체", benefit_type="cashback", rate=2.0, monthly_cap=None, min_amount=None, flat_amount=None):
     benefit_id = str(_uuid.uuid4())
+    # 새 스키마: "전체"는 target_type='all' + category NULL로 표현
+    target_type = "all" if category == "전체" else "category"
+    category_value = None if category == "전체" else category
     with engine.begin() as conn:
         conn.execute(
             sa.text(
                 "INSERT INTO catalog_benefits "
-                "(id, catalog_id, category, benefit_type, rate, flat_amount, monthly_cap, min_amount, created_at) "
-                "VALUES (:id, :catalog_id, :category, :benefit_type, :rate, :flat_amount, :monthly_cap, :min_amount, NOW())"
+                "(id, catalog_id, target_type, category, benefit_type, rate, flat_amount, monthly_cap, min_amount, requires_performance, created_at) "
+                "VALUES (:id, :catalog_id, :target_type, :category, :benefit_type, :rate, :flat_amount, :monthly_cap, :min_amount, false, NOW())"
             ),
             {
                 "id": benefit_id,
                 "catalog_id": catalog_id,
-                "category": category,
+                "target_type": target_type,
+                "category": category_value,
                 "benefit_type": benefit_type,
                 "rate": rate,
                 "flat_amount": flat_amount,

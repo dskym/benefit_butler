@@ -17,6 +17,7 @@ cd frontend && npx expo start --web                    # 웹 개발
 cd frontend && npx expo start                          # 네이티브 (Expo Go)
 cd frontend && npx expo prebuild --platform android --clean && npx expo run:android  # Android dev build
 cd backend && uvicorn app.main:app --reload            # 백엔드
+cd backend && alembic upgrade head && python -m scripts.seed_catalog  # 마이그레이션 + 카드 카탈로그 시드 (멱등, 재실행 안전)
 ```
 
 ## 파일 구조

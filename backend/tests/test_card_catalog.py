@@ -100,6 +100,7 @@ def test_catalog_detail_returns_200(client):
     assert body["id"] == catalog_id
     assert body["name"] == "테스트 카드"
     assert body["issuer"] == "테스트카드사"
+    assert body["benefits"] == []  # 혜택 없는 카탈로그 카드는 빈 배열
 
 
 def test_catalog_detail_not_found_returns_404(client):
