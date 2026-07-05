@@ -205,3 +205,91 @@ def test_delete_nonexistent_benefit_returns_404(client, auth_headers):
 def test_benefit_requires_auth(client):
     resp = client.get("/api/v1/cards/00000000-0000-0000-0000-000000000000/benefits")
     assert resp.status_code in (401, 403)
+
+
+# ── merchant 타겟 혜택 CRUD ───────────────────────────────────────────────────
+
+
+def test_create_merchant_target_benefit(client, auth_headers):
+    card = _create_user_card(client, auth_headers)
+    resp = client.post(f"/api/v1/cards/{card['id']}/benefits", headers=auth_headers, json={
+        "title": "스타벅스 50%",
+        "target_type": "merchant",
+        "merchant_names": ["스타벅스"],
+        "benefit_type": "cashback",
+        "rate": 50.0,
+        "requires_performance": True,
+    })
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["target_type"] == "merchant"
+    assert body["merchant_names"] == ["스타벅스"]
+    assert body["category"] is None
+    assert body["requires_performance"] is True
+
+
+def test_create_merchant_benefit_without_names_returns_422(client, auth_headers):
+    card = _create_user_card(client, auth_headers)
+    resp = client.post(f"/api/v1/cards/{card['id']}/benefits", headers=auth_headers, json={
+        "target_type": "merchant", "merchant_names": [], "benefit_type": "cashback", "rate": 1.0,
+    })
+    assert resp.status_code == 422
+
+
+def test_create_category_benefit_without_category_returns_422(client, auth_headers):
+    card = _create_user_card(client, auth_headers)
+    resp = client.post(f"/api/v1/cards/{card['id']}/benefits", headers=auth_headers, json={
+        "target_type": "category", "benefit_type": "cashback", "rate": 1.0,
+    })
+    assert resp.status_code == 422
+
+
+def test_create_benefit_with_unknown_category_returns_422(client, auth_headers):
+    card = _create_user_card(client, auth_headers)
+    resp = client.post(f"/api/v1/cards/{card['id']}/benefits", headers=auth_headers, json={
+        "target_type": "category", "category": "없는카테고리", "benefit_type": "cashback", "rate": 1.0,
+    })
+    assert resp.status_code == 422
+
+
+def test_legacy_jeonche_category_creates_all_target(client, auth_headers):
+    """구 클라이언트 호환: category='전체' → target_type='all'."""
+    card = _create_user_card(client, auth_headers)
+    resp = client.post(f"/api/v1/cards/{card['id']}/benefits", headers=auth_headers, json={
+        "category": "전체", "benefit_type": "cashback", "rate": 0.7,
+    })
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["target_type"] == "all"
+    assert body["category"] is None
+
+
+def test_update_benefit_merchant_names_replaces_targets(client, auth_headers):
+    card = _create_user_card(client, auth_headers)
+    benefit = client.post(f"/api/v1/cards/{card['id']}/benefits", headers=auth_headers, json={
+        "target_type": "merchant", "merchant_names": ["스타벅스"], "benefit_type": "cashback", "rate": 10.0,
+    }).json()
+    resp = client.patch(
+        f"/api/v1/cards/{card['id']}/benefits/{benefit['id']}",
+        headers=auth_headers,
+        json={"merchant_names": ["이디야커피", "투썸플레이스"]},
+    )
+    assert resp.status_code == 200
+    assert sorted(resp.json()["merchant_names"]) == ["이디야커피", "투썸플레이스"]
+
+
+def test_update_benefit_switch_merchant_to_category(client, auth_headers):
+    card = _create_user_card(client, auth_headers)
+    benefit = client.post(f"/api/v1/cards/{card['id']}/benefits", headers=auth_headers, json={
+        "target_type": "merchant", "merchant_names": ["스타벅스"], "benefit_type": "cashback", "rate": 10.0,
+    }).json()
+    resp = client.patch(
+        f"/api/v1/cards/{card['id']}/benefits/{benefit['id']}",
+        headers=auth_headers,
+        json={"target_type": "category", "category": "식비"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["target_type"] == "category"
+    assert body["category"] == "식비"
+    assert body["merchant_names"] == []

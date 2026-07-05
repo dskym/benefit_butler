@@ -5,8 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.auth import get_current_user
 from app.core.database import get_db
-from app.schemas.card_benefit import RecommendRequest, RecommendResult
+from app.models.merchant import Merchant
+from app.schemas.card_benefit import RecommendRequest, RecommendResponse, ResolvedMerchantInfo
 from app.schemas.user_card import CardPerformanceItem, UserCardCreate, UserCardResponse, UserCardUpdate
+from app.services.merchant_resolver import resolve_merchant
 import app.services.user_card as card_service
 import app.services.card_recommendation as recommend_service
 
@@ -57,11 +59,42 @@ def delete_card(
     card_service.delete_card(db, current_user.id, card_id)
 
 
-@router.post("/recommend", response_model=list[RecommendResult])
-def recommend_cards(
+@router.post("/recommend", response_model=RecommendResponse)
+async def recommend_cards(
     data: RecommendRequest,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    amount = data.amount if data.amount is not None else 10000
-    return recommend_service.recommend_cards(db, current_user.id, data.category, amount)
+    resolved: ResolvedMerchantInfo | None = None
+    merchant_id = data.merchant_id
+    category = data.category
+
+    if merchant_id is not None:
+        merchant = db.get(Merchant, merchant_id)
+        if merchant is not None:
+            resolved = ResolvedMerchantInfo(
+                merchant_id=merchant.id,
+                merchant_name=merchant.name,
+                category=merchant.category,
+                source="alias",
+                confidence=1.0,
+            )
+            if category is None:
+                category = merchant.category
+    elif data.merchant_name:
+        r = await resolve_merchant(db, data.merchant_name)
+        resolved = ResolvedMerchantInfo(
+            merchant_id=r.merchant_id,
+            merchant_name=r.merchant_name,
+            category=r.category,
+            source=r.source,
+            confidence=r.confidence,
+        )
+        merchant_id = r.merchant_id
+        if category is None:
+            category = r.category
+
+    results = recommend_service.recommend_cards(
+        db, current_user.id, amount=data.amount, merchant_id=merchant_id, category=category
+    )
+    return RecommendResponse(resolved=resolved, results=results)

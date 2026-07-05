@@ -1,16 +1,25 @@
-"""Card recommendation algorithm.
+"""카드 추천 엔진.
 
-Score = effective_benefit_value + performance_bonus
+사용자 보유 카드의 user_card_benefits만 평가한다 (카탈로그 혜택은 카드 등록 시
+user_card_benefits로 스냅샷 복사되므로 여기서 fallback하지 않는다).
 
-effective_benefit_value:
-  cashback/points: int(amount * rate / 100)
-  discount/free:   flat_amount
-  → min(above, monthly_cap - used_this_month) if monthly_cap set
+혜택 매칭 계층(tier):
+  2 — merchant 타겟에 해당 가맹점 포함
+  1 — category 타겟이 요청 카테고리와 일치
+  0 — target_type = "all"
+  None — 불일치(제외)
 
-performance_bonus:
-  remaining / monthly_target < 20%  →  +500 (sort weight)
+혜택별 조건:
+  - min_amount > 결제금액 → 제외
+  - requires_performance=True인데 전월(직전 실적기간) 지출 < monthly_target → 제외
+    (monthly_target 미설정 카드는 충족으로 간주)
 
-Benefit priority: user_card_benefits first → catalog_benefits fallback.
+혜택 가치:
+  cashback/points → int(amount * rate / 100), discount/free → flat_amount,
+  monthly_cap이 있으면 min(값, monthly_cap).
+
+카드 내 최적 혜택은 (가치 desc, tier desc)로 선택 — 동가치면 가맹점 > 카테고리 > 전체.
+전체 결과는 effective_value desc로 정렬. 실적 임박(is_near_target)은 정보 플래그다.
 """
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -18,88 +27,82 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.card_benefit import CatalogBenefit, UserCardBenefit
+from app.models.card_benefit import UserCardBenefit
 from app.models.user_card import UserCard
-from app.schemas.card_benefit import RecommendResult
+from app.schemas.card_benefit import RecommendItem
 from app.services.user_card import get_performance_period
 
 
 # ── Pure calculation helpers ──────────────────────────────────────────────────
 
 
-def _calc_raw_benefit(benefit_type: str, rate: float | None, flat_amount: int | None, amount: int) -> int:
-    if benefit_type in ("cashback", "points"):
-        return int(amount * (rate or 0) / 100)
-    if benefit_type in ("discount", "free"):
-        return flat_amount or 0
-    return 0
-
-
-def _calc_effective_benefit(
-    benefit_type: str,
-    rate: float | None,
-    flat_amount: int | None,
-    monthly_cap: int | None,
-    amount: int,
-    used_this_month: int,
-) -> int:
-    raw = _calc_raw_benefit(benefit_type, rate, flat_amount, amount)
-    if monthly_cap is not None:
-        remaining_cap = max(0, monthly_cap - used_this_month)
-        raw = min(raw, remaining_cap)
+def _calc_effective_benefit(benefit: UserCardBenefit, amount: int) -> int:
+    if benefit.benefit_type in ("cashback", "points"):
+        raw = int(amount * (benefit.rate or 0) / 100)
+    elif benefit.benefit_type in ("discount", "free"):
+        raw = benefit.flat_amount or 0
+    else:
+        raw = 0
+    if benefit.monthly_cap is not None:
+        raw = min(raw, benefit.monthly_cap)
     return raw
 
 
-def _calc_performance_bonus(remaining: int | None, monthly_target: int | None) -> int:
-    if remaining is not None and monthly_target and monthly_target > 0:
-        if remaining / monthly_target < 0.2:
-            return 500
-    return 0
+def _match_tier(
+    benefit: UserCardBenefit,
+    merchant_id: uuid.UUID | None,
+    category: str | None,
+) -> int | None:
+    if benefit.target_type == "merchant":
+        if merchant_id is not None and any(m.id == merchant_id for m in benefit.merchants):
+            return 2
+        return None
+    if benefit.target_type == "category":
+        if category is not None and benefit.category == category:
+            return 1
+        return None
+    if benefit.target_type == "all":
+        return 0
+    return None
 
 
-def _benefit_description(
-    benefit_type: str, rate: float | None, flat_amount: int | None, monthly_cap: int | None, category: str
-) -> str:
-    parts: list[str] = []
-    if benefit_type == "cashback":
-        parts.append(f"{category} {rate}% 캐시백")
-    elif benefit_type == "points":
-        parts.append(f"{category} {rate}% 포인트 적립")
-    elif benefit_type == "discount":
-        parts.append(f"{category} {flat_amount:,}원 할인")
-    elif benefit_type == "free":
-        parts.append(f"{category} 무료 제공")
-    if monthly_cap:
-        parts.append(f"월 최대 {monthly_cap:,}원")
-    return " / ".join(parts)
+_MATCHED_BY = {2: "merchant", 1: "category", 0: "all"}
 
 
-# ── Used-this-month for a card-benefit calculation ────────────────────────────
+def _benefit_description(benefit: UserCardBenefit) -> str:
+    if benefit.target_type == "merchant":
+        names = benefit.merchant_names
+        label = "/".join(names[:2]) + (f" 외 {len(names) - 2}곳" if len(names) > 2 else "")
+    elif benefit.target_type == "category":
+        label = benefit.category or ""
+    else:
+        label = "전체"
+
+    if benefit.benefit_type == "cashback":
+        body = f"{label} {benefit.rate}% 캐시백"
+    elif benefit.benefit_type == "points":
+        body = f"{label} {benefit.rate}% 포인트 적립"
+    elif benefit.benefit_type == "discount":
+        body = f"{label} {benefit.flat_amount:,}원 할인"
+    elif benefit.benefit_type == "free":
+        body = f"{label} 무료 제공"
+    else:
+        body = label
+
+    if benefit.monthly_cap:
+        body += f" / 월 최대 {benefit.monthly_cap:,}원"
+    return body
 
 
-def _get_used_benefit_amount(
-    db: Session,
-    user_card_id: uuid.UUID,
-    billing_day: int | None,
-    today: date,
-) -> int:
-    """Approximate 'used benefit amount' this period.
+# ── Spending / performance helpers ────────────────────────────────────────────
 
-    We proxy used_this_month as current_spending for simplicity — the benefit
-    engine uses this only to cap against monthly_cap.  A more precise
-    implementation would track actual benefit redemptions; this approximation
-    is sufficient for sorting purposes.
-    """
+
+def _sum_expense(db: Session, user_card_id: uuid.UUID, start: date, end: date) -> int:
     from app.models.transaction import Transaction  # avoid circular import
 
-    start, end = get_performance_period(billing_day, today)
     start_dt = datetime(start.year, start.month, start.day, tzinfo=timezone.utc)
-    end_dt = datetime(
-        (end + timedelta(days=1)).year,
-        (end + timedelta(days=1)).month,
-        (end + timedelta(days=1)).day,
-        tzinfo=timezone.utc,
-    )
+    end_next = end + timedelta(days=1)
+    end_dt = datetime(end_next.year, end_next.month, end_next.day, tzinfo=timezone.utc)
     raw = db.scalar(
         select(func.sum(Transaction.amount)).where(
             Transaction.user_card_id == user_card_id,
@@ -111,112 +114,81 @@ def _get_used_benefit_amount(
     return int(raw or 0)
 
 
+def _performance_met(db: Session, card: UserCard, today: date) -> bool | None:
+    """전월(직전 실적기간) 지출이 monthly_target 이상인지. 목표 미설정이면 None(충족 간주)."""
+    if not card.monthly_target:
+        return None
+    current_start, _ = get_performance_period(card.billing_day, today)
+    prev_start, prev_end = get_performance_period(card.billing_day, current_start - timedelta(days=1))
+    return _sum_expense(db, card.id, prev_start, prev_end) >= card.monthly_target
+
+
+def _is_near_target(db: Session, card: UserCard, today: date) -> bool:
+    """이번 실적기간 잔여 실적이 목표의 20% 미만이면 True (정보 플래그)."""
+    if not card.monthly_target:
+        return False
+    start, end = get_performance_period(card.billing_day, today)
+    spending = _sum_expense(db, card.id, start, end)
+    remaining = max(0, card.monthly_target - spending)
+    return remaining / card.monthly_target < 0.2
+
+
 # ── Main recommend function ───────────────────────────────────────────────────
 
 
 def recommend_cards(
     db: Session,
     user_id: uuid.UUID,
-    category: str | None,
+    *,
     amount: int,
-) -> list[RecommendResult]:
-    """Return cards sorted by expected benefit score, highest first.
-
-    category=None  → match only "전체" benefits
-    category=<str> → match exact category OR "전체"
-    """
+    merchant_id: uuid.UUID | None = None,
+    category: str | None = None,
+) -> list[RecommendItem]:
+    """보유 카드별 최적 혜택을 평가해 기대 혜택 큰 순으로 반환."""
     today = date.today()
+    cards = list(db.scalars(select(UserCard).where(UserCard.user_id == user_id)).all())
 
-    cards: list[UserCard] = list(
-        db.scalars(
-            select(UserCard).where(UserCard.user_id == user_id)
-        ).all()
-    )
-
-    results: list[tuple[int, RecommendResult]] = []
-
+    items: list[RecommendItem] = []
     for card in cards:
-        # 1. Determine benefits to use (user override first, then catalog fallback)
-        user_benefits: list[UserCardBenefit] = list(
-            db.scalars(
-                select(UserCardBenefit).where(UserCardBenefit.user_card_id == card.id)
-            ).all()
+        benefits = list(
+            db.scalars(select(UserCardBenefit).where(UserCardBenefit.user_card_id == card.id)).all()
         )
-
-        if user_benefits:
-            # Use only user-defined benefits
-            candidate_benefits = [
-                (b.target_type, b.category, b.benefit_type, b.rate, b.flat_amount, b.monthly_cap, b.min_amount)
-                for b in user_benefits
-            ]
-        elif card.catalog_id:
-            # Fallback to catalog benefits
-            catalog_benefits: list[CatalogBenefit] = list(
-                db.scalars(
-                    select(CatalogBenefit).where(CatalogBenefit.catalog_id == card.catalog_id)
-                ).all()
-            )
-            candidate_benefits = [
-                (b.target_type, b.category, b.benefit_type, b.rate, b.flat_amount, b.monthly_cap, b.min_amount)
-                for b in catalog_benefits
-            ]
-        else:
-            candidate_benefits = []
-
-        # 2. Filter matching benefits — 구 "전체" 카테고리는 target_type="all"로 표현됨.
-        #    merchant 타겟 매칭은 추천 엔진 재작성(PR2)에서 지원한다.
-        matching = [
-            b for b in candidate_benefits
-            if b[0] == "all" or (category and b[0] == "category" and b[1] == category)
-        ]
-
-        if not matching:
+        if not benefits:
             continue
 
-        # 3. Pick best matching benefit for this card
-        used = _get_used_benefit_amount(db, card.id, card.billing_day, today)
-        best_value = 0
-        best_benefit = None
-        for b in matching:
-            _, b_cat, b_type, b_rate, b_flat, b_cap, b_min = b
-            # Check min_amount condition
-            if b_min and amount < b_min:
+        performance_met = _performance_met(db, card, today)
+
+        best: tuple[int, int, UserCardBenefit] | None = None  # (value, tier, benefit)
+        for benefit in benefits:
+            tier = _match_tier(benefit, merchant_id, category)
+            if tier is None:
                 continue
-            value = _calc_effective_benefit(b_type, b_rate, b_flat, b_cap, amount, used)
-            if value > best_value:
-                best_value = value
-                best_benefit = b
+            if benefit.min_amount and amount < benefit.min_amount:
+                continue
+            if benefit.requires_performance and performance_met is False:
+                continue
+            value = _calc_effective_benefit(benefit, amount)
+            if best is None or (value, tier) > (best[0], best[1]):
+                best = (value, tier, benefit)
 
-        if best_benefit is None:
-            # All benefits had min_amount > amount; still include with value=0
-            # only if there's at least one benefit (skip card entirely if no match)
+        if best is None:
             continue
 
-        b_target, b_cat, b_type, b_rate, b_flat, b_cap, b_min = best_benefit
-        if b_target == "all":
-            b_cat = "전체"  # 설명 문구용 라벨
-
-        # 4. Performance bonus
-        perf_remaining: int | None = None
-        if card.monthly_target is not None:
-            perf_remaining = max(0, card.monthly_target - used)
-        bonus = _calc_performance_bonus(perf_remaining, card.monthly_target)
-        score = best_value + bonus
-
-        description = _benefit_description(b_type, b_rate, b_flat, b_cap, b_cat)
-        is_near = bonus > 0
-
-        results.append((
-            score,
-            RecommendResult(
+        value, tier, benefit = best
+        items.append(
+            RecommendItem(
                 card_id=str(card.id),
                 card_name=card.name,
-                benefit_type=b_type,
-                benefit_description=description,
-                effective_value=best_value,
-                is_near_target=is_near,
+                benefit_title=benefit.title,
+                benefit_type=benefit.benefit_type,
+                benefit_description=_benefit_description(benefit),
+                matched_by=_MATCHED_BY[tier],
+                effective_value=value,
+                performance_required=benefit.requires_performance,
+                performance_met=performance_met,
+                is_near_target=_is_near_target(db, card, today),
             )
-        ))
+        )
 
-    results.sort(key=lambda x: x[0], reverse=True)
-    return [r for _, r in results]
+    items.sort(key=lambda item: item.effective_value, reverse=True)
+    return items
