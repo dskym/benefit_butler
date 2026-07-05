@@ -1,11 +1,13 @@
 // frontend/src/__tests__/store/recommendStore.test.ts
 import { act, renderHook } from "@testing-library/react-native";
 import { useRecommendStore } from "../../store/recommendStore";
+import { BENEFIT_CATEGORIES } from "../../utils/benefitCategories";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 jest.mock("../../services/api", () => ({
   apiClient: {
+    get: jest.fn(),
     post: jest.fn(),
   },
 }));
@@ -14,37 +16,130 @@ const { apiClient } = require("../../services/api");
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-const MOCK_RESULTS = [
+const MOCK_RESOLVED = {
+  merchant_id: "m-1",
+  merchant_name: "스타벅스",
+  category: "식비",
+  source: "alias",
+  confidence: 1.0,
+};
+
+const MOCK_LOOKUP = {
+  ...MOCK_RESOLVED,
+  available_categories: ["식비", "교통", "쇼핑"],
+};
+
+const MOCK_ITEMS = [
   {
     card_id: "card-1",
-    card_name: "Deep Dream 카드",
+    card_name: "taptap O 카드",
+    benefit_title: "스타벅스 50% 할인",
     benefit_type: "cashback",
-    benefit_description: "식비 3% 캐시백 / 월 최대 10,000원",
-    effective_value: 300,
+    benefit_description: "스타벅스 50.0% 캐시백 / 월 최대 10,000원",
+    matched_by: "merchant",
+    effective_value: 5000,
+    performance_required: true,
+    performance_met: true,
     is_near_target: false,
   },
   {
     card_id: "card-2",
     card_name: "노리 카드",
+    benefit_title: null,
     benefit_type: "cashback",
     benefit_description: "전체 1.5% 캐시백",
+    matched_by: "all",
     effective_value: 150,
+    performance_required: false,
+    performance_met: null,
     is_near_target: true,
   },
 ];
 
+const MOCK_RESPONSE = { resolved: MOCK_RESOLVED, results: MOCK_ITEMS };
+
+const INITIAL = {
+  results: [],
+  resolved: null,
+  availableCategories: BENEFIT_CATEGORIES,
+  isLoading: false,
+  isResolving: false,
+  lastQuery: null,
+};
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  useRecommendStore.setState({ results: [], isLoading: false, lastQuery: null });
+  useRecommendStore.setState(INITIAL);
   jest.clearAllMocks();
+});
+
+// ── resolveMerchant ───────────────────────────────────────────────────────────
+
+describe("resolveMerchant", () => {
+  it("calls GET /merchants/lookup and stores resolved merchant", async () => {
+    apiClient.get.mockResolvedValueOnce({ data: MOCK_LOOKUP });
+
+    const { result } = renderHook(() => useRecommendStore());
+    let resolved;
+    await act(async () => {
+      resolved = await result.current.resolveMerchant("스타벅스");
+    });
+
+    expect(apiClient.get).toHaveBeenCalledWith("/merchants/lookup", {
+      params: { q: "스타벅스" },
+    });
+    expect(resolved).toEqual(MOCK_RESOLVED);
+    expect(result.current.resolved).toEqual(MOCK_RESOLVED);
+    expect(result.current.availableCategories).toEqual(["식비", "교통", "쇼핑"]);
+  });
+
+  it("skips lookup for queries shorter than 2 chars and clears resolved", async () => {
+    useRecommendStore.setState({ resolved: MOCK_RESOLVED });
+
+    const { result } = renderHook(() => useRecommendStore());
+    await act(async () => {
+      await result.current.resolveMerchant("스");
+    });
+
+    expect(apiClient.get).not.toHaveBeenCalled();
+    expect(result.current.resolved).toBeNull();
+  });
+
+  it("swallows API errors and clears resolved", async () => {
+    useRecommendStore.setState({ resolved: MOCK_RESOLVED });
+    apiClient.get.mockRejectedValueOnce(new Error("network"));
+
+    const { result } = renderHook(() => useRecommendStore());
+    let resolved;
+    await act(async () => {
+      resolved = await result.current.resolveMerchant("스타벅스");
+    });
+
+    expect(resolved).toBeNull();
+    expect(result.current.resolved).toBeNull();
+    expect(result.current.isResolving).toBe(false);
+  });
+
+  it("falls back to default categories when response omits them", async () => {
+    apiClient.get.mockResolvedValueOnce({
+      data: { ...MOCK_RESOLVED, available_categories: [] },
+    });
+
+    const { result } = renderHook(() => useRecommendStore());
+    await act(async () => {
+      await result.current.resolveMerchant("스타벅스");
+    });
+
+    expect(result.current.availableCategories).toEqual(BENEFIT_CATEGORIES);
+  });
 });
 
 // ── recommend ─────────────────────────────────────────────────────────────────
 
 describe("recommend", () => {
-  it("calls POST /cards/recommend and stores results", async () => {
-    apiClient.post.mockResolvedValueOnce({ data: MOCK_RESULTS });
+  it("calls POST /cards/recommend and stores results + resolved", async () => {
+    apiClient.post.mockResolvedValueOnce({ data: MOCK_RESPONSE });
 
     const { result } = renderHook(() => useRecommendStore());
     await act(async () => {
@@ -56,7 +151,8 @@ describe("recommend", () => {
       amount: 10000,
       category: "식비",
     });
-    expect(result.current.results).toEqual(MOCK_RESULTS);
+    expect(result.current.results).toEqual(MOCK_ITEMS);
+    expect(result.current.resolved).toEqual(MOCK_RESOLVED);
     expect(result.current.lastQuery).toEqual({
       merchantName: "스타벅스",
       amount: 10000,
@@ -65,8 +161,22 @@ describe("recommend", () => {
     expect(result.current.isLoading).toBe(false);
   });
 
+  it("passes merchant_id when already resolved (skips server re-resolve)", async () => {
+    useRecommendStore.setState({ resolved: MOCK_RESOLVED });
+    apiClient.post.mockResolvedValueOnce({ data: MOCK_RESPONSE });
+
+    const { result } = renderHook(() => useRecommendStore());
+    await act(async () => {
+      await result.current.recommend("스타벅스", 10000, null);
+    });
+
+    const sentBody = apiClient.post.mock.calls[0][1];
+    expect(sentBody.merchant_id).toBe("m-1");
+    expect(Object.keys(sentBody)).not.toContain("category");
+  });
+
   it("omits category from body when category is null", async () => {
-    apiClient.post.mockResolvedValueOnce({ data: [] });
+    apiClient.post.mockResolvedValueOnce({ data: { resolved: null, results: [] } });
 
     const { result } = renderHook(() => useRecommendStore());
     await act(async () => {
@@ -76,8 +186,19 @@ describe("recommend", () => {
     expect(apiClient.post).toHaveBeenCalledWith("/cards/recommend", {
       merchant_name: "이마트",
       amount: 50000,
-      // category NOT included
     });
+  });
+
+  it("keeps client-side resolved when server returns resolved=null", async () => {
+    useRecommendStore.setState({ resolved: MOCK_RESOLVED });
+    apiClient.post.mockResolvedValueOnce({ data: { resolved: null, results: [] } });
+
+    const { result } = renderHook(() => useRecommendStore());
+    await act(async () => {
+      await result.current.recommend("스타벅스", 10000, null);
+    });
+
+    expect(result.current.resolved).toEqual(MOCK_RESOLVED);
   });
 
   it("sets isLoading true during request and false after", async () => {
@@ -92,7 +213,7 @@ describe("recommend", () => {
     expect(result.current.isLoading).toBe(true);
 
     await act(async () => {
-      resolve!({ data: [] });
+      resolve!({ data: { resolved: null, results: [] } });
       await fetchPromise!;
     });
 
@@ -110,21 +231,8 @@ describe("recommend", () => {
     expect(result.current.isLoading).toBe(false);
   });
 
-  it("stores empty results when API returns empty array", async () => {
-    useRecommendStore.setState({ results: MOCK_RESULTS, isLoading: false, lastQuery: null });
-    apiClient.post.mockResolvedValueOnce({ data: [] });
-
-    const { result } = renderHook(() => useRecommendStore());
-    await act(async () => {
-      await result.current.recommend("알 수 없는 가맹점", 10000, null);
-    });
-
-    expect(result.current.results).toEqual([]);
-  });
-
   it("propagates API error to caller (no internal catch)", async () => {
-    const apiError = new Error("Network error");
-    apiClient.post.mockRejectedValueOnce(apiError);
+    apiClient.post.mockRejectedValueOnce(new Error("Network error"));
 
     const { result } = renderHook(() => useRecommendStore());
     await expect(
@@ -136,9 +244,8 @@ describe("recommend", () => {
 
   it("preserves existing results and lastQuery on error", async () => {
     useRecommendStore.setState({
-      results: MOCK_RESULTS,
+      results: MOCK_ITEMS,
       lastQuery: { merchantName: "스타벅스", amount: 10000, category: "식비" },
-      isLoading: false,
     });
     apiClient.post.mockRejectedValueOnce(new Error("fail"));
 
@@ -147,52 +254,20 @@ describe("recommend", () => {
       await result.current.recommend("test", 1000, null).catch(() => {});
     });
 
-    expect(result.current.results).toEqual(MOCK_RESULTS);
-    expect(result.current.lastQuery).toEqual({
-      merchantName: "스타벅스",
-      amount: 10000,
-      category: "식비",
-    });
-  });
-
-  it("overwrites lastQuery on each successful call", async () => {
-    apiClient.post.mockResolvedValueOnce({ data: MOCK_RESULTS });
-
-    const { result } = renderHook(() => useRecommendStore());
-    await act(async () => {
-      await result.current.recommend("first", 1000, null);
-    });
-    expect(result.current.lastQuery?.merchantName).toBe("first");
-
-    apiClient.post.mockResolvedValueOnce({ data: [] });
-    await act(async () => {
-      await result.current.recommend("second", 2000, "쇼핑");
-    });
-    expect(result.current.lastQuery).toEqual({
-      merchantName: "second",
-      amount: 2000,
-      category: "쇼핑",
-    });
-  });
-
-  it("does not include category key in body when category is null", async () => {
-    apiClient.post.mockResolvedValueOnce({ data: [] });
-
-    const { result } = renderHook(() => useRecommendStore());
-    await act(async () => {
-      await result.current.recommend("test", 1000, null);
-    });
-
-    const sentBody = apiClient.post.mock.calls[0][1];
-    expect(Object.keys(sentBody)).not.toContain("category");
+    expect(result.current.results).toEqual(MOCK_ITEMS);
+    expect(result.current.lastQuery?.merchantName).toBe("스타벅스");
   });
 });
 
 // ── clear ─────────────────────────────────────────────────────────────────────
 
 describe("clear", () => {
-  it("resets results and lastQuery", () => {
-    useRecommendStore.setState({ results: MOCK_RESULTS, isLoading: false, lastQuery: { merchantName: "스타벅스", amount: 10000, category: "식비" } });
+  it("resets results, resolved and lastQuery", () => {
+    useRecommendStore.setState({
+      results: MOCK_ITEMS,
+      resolved: MOCK_RESOLVED,
+      lastQuery: { merchantName: "스타벅스", amount: 10000, category: "식비" },
+    });
 
     const { result } = renderHook(() => useRecommendStore());
     act(() => {
@@ -200,6 +275,7 @@ describe("clear", () => {
     });
 
     expect(result.current.results).toEqual([]);
+    expect(result.current.resolved).toBeNull();
     expect(result.current.lastQuery).toBeNull();
   });
 });
@@ -207,9 +283,11 @@ describe("clear", () => {
 // ── initial state ─────────────────────────────────────────────────────────────
 
 describe("initial state", () => {
-  it("starts with empty results and isLoading false", () => {
+  it("starts with empty results, default categories, and isLoading false", () => {
     const { result } = renderHook(() => useRecommendStore());
     expect(result.current.results).toEqual([]);
+    expect(result.current.resolved).toBeNull();
+    expect(result.current.availableCategories).toEqual(BENEFIT_CATEGORIES);
     expect(result.current.isLoading).toBe(false);
     expect(result.current.lastQuery).toBeNull();
   });

@@ -19,11 +19,23 @@ const makeCard = (id: string, name: string) => ({
   name,
   monthly_target: null,
   billing_day: null,
+  catalog_id: null,
   created_at: "2026-01-01T00:00:00Z",
 });
 
+const makeCatalog = (id: string, name: string) => ({
+  id,
+  name,
+  issuer: "신한카드",
+  card_type: "credit_card" as const,
+  image_url: null,
+  is_active: true,
+  created_at: "2026-01-01T00:00:00Z",
+  benefits: [],
+});
+
 beforeEach(() => {
-  useCardStore.setState({ cards: [], isLoading: false });
+  useCardStore.setState({ cards: [], catalogResults: [], isLoading: false, isSearchingCatalog: false });
   jest.clearAllMocks();
 });
 
@@ -85,6 +97,62 @@ describe("createCard", () => {
       type: "credit_card",
       name: "신한카드",
     });
+  });
+
+  it("passes catalog_id for catalog-linked card creation", async () => {
+    const newCard = { ...makeCard("card-1", "Deep Dream 카드"), catalog_id: "cat-1" };
+    (apiClient.post as jest.Mock).mockResolvedValue({ data: newCard });
+
+    await useCardStore
+      .getState()
+      .createCard({ type: "credit_card", name: "Deep Dream 카드", catalog_id: "cat-1" });
+
+    expect(apiClient.post).toHaveBeenCalledWith("/cards/", {
+      type: "credit_card",
+      name: "Deep Dream 카드",
+      catalog_id: "cat-1",
+    });
+    expect(useCardStore.getState().cards[0].catalog_id).toBe("cat-1");
+  });
+});
+
+// ─── searchCatalog ────────────────────────────────────────────────────────────
+
+describe("searchCatalog", () => {
+  it("calls GET /cards/catalog/ with query and stores results", async () => {
+    const results = [makeCatalog("cat-1", "Deep Dream 카드")];
+    (apiClient.get as jest.Mock).mockResolvedValue({ data: results });
+
+    await useCardStore.getState().searchCatalog("딥드림");
+
+    expect(apiClient.get).toHaveBeenCalledWith("/cards/catalog/", { params: { q: "딥드림" } });
+    expect(useCardStore.getState().catalogResults).toEqual(results);
+    expect(useCardStore.getState().isSearchingCatalog).toBe(false);
+  });
+
+  it("clears results for empty query without calling API", async () => {
+    useCardStore.setState({ catalogResults: [makeCatalog("cat-1", "x")] });
+
+    await useCardStore.getState().searchCatalog("  ");
+
+    expect(apiClient.get).not.toHaveBeenCalled();
+    expect(useCardStore.getState().catalogResults).toEqual([]);
+  });
+
+  it("swallows API errors and clears results", async () => {
+    useCardStore.setState({ catalogResults: [makeCatalog("cat-1", "x")] });
+    (apiClient.get as jest.Mock).mockRejectedValue(new Error("network"));
+
+    await useCardStore.getState().searchCatalog("딥드림");
+
+    expect(useCardStore.getState().catalogResults).toEqual([]);
+    expect(useCardStore.getState().isSearchingCatalog).toBe(false);
+  });
+
+  it("clearCatalogResults empties the list", () => {
+    useCardStore.setState({ catalogResults: [makeCatalog("cat-1", "x")] });
+    useCardStore.getState().clearCatalogResults();
+    expect(useCardStore.getState().catalogResults).toEqual([]);
   });
 });
 

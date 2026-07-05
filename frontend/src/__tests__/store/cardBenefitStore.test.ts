@@ -29,23 +29,31 @@ const CARD_ID = "card-111";
 const BENEFIT_1 = {
   id: "benefit-1",
   user_card_id: CARD_ID,
+  title: null,
+  target_type: "category" as const,
   category: "식비",
-  benefit_type: "cashback",
+  merchant_names: [] as string[],
+  benefit_type: "cashback" as const,
   rate: 3.0,
   flat_amount: null,
   monthly_cap: 10000,
   min_amount: null,
+  requires_performance: false,
   created_at: "2026-02-26T00:00:00Z",
 };
 const BENEFIT_2 = {
   id: "benefit-2",
   user_card_id: CARD_ID,
-  category: "전체",
-  benefit_type: "points",
+  title: "스타벅스 50% 할인",
+  target_type: "merchant" as const,
+  category: null,
+  merchant_names: ["스타벅스"],
+  benefit_type: "points" as const,
   rate: 1.0,
   flat_amount: null,
   monthly_cap: null,
   min_amount: null,
+  requires_performance: true,
   created_at: "2026-02-26T00:01:00Z",
 };
 
@@ -127,6 +135,7 @@ describe("createBenefit", () => {
     let returned: any;
     await act(async () => {
       returned = await result.current.createBenefit(CARD_ID, {
+        target_type: "category",
         category: "식비",
         benefit_type: "cashback",
         rate: 3.0,
@@ -145,6 +154,7 @@ describe("createBenefit", () => {
     const { result } = renderHook(() => useCardBenefitStore());
     await act(async () => {
       await result.current.createBenefit(CARD_ID, {
+        target_type: "category",
         category: "식비",
         benefit_type: "cashback",
         rate: 3.0,
@@ -160,7 +170,7 @@ describe("createBenefit", () => {
     const { result } = renderHook(() => useCardBenefitStore());
     await expect(
       act(async () => {
-        await result.current.createBenefit(CARD_ID, { category: "전체", benefit_type: "cashback" });
+        await result.current.createBenefit(CARD_ID, { target_type: "all", benefit_type: "cashback" });
       })
     ).rejects.toThrow("API error");
   });
